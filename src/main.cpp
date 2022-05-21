@@ -6,67 +6,16 @@ using std::endl;
 using std::string;
 using std::wstring;
 using std::vector;
+using std::optional;
 
 namespace fs = std::filesystem;
 
 using json = nlohmann::json;
-using str_refc = const std::string&;
+using str_cref = const std::string&;
 
 // TODO: better error handling in general
 
-std::optional<json> download_json_from_reddit(const string& after = "",
-                                              unsigned limit = 100)
-{
-    std::stringstream ss;
-
-    // Our request to be sent.
-    curlpp::Easy request;
-
-    ss << "https://www.reddit.com/";
-    ss << "r/VaporwaveAesthetics/";
-    ss << "top.json";
-    ss << "?t=all";
-    ss << "&limit=" << limit;
-
-    if (after != "")
-    {
-        ss << "&after=" << after;
-    }
-
-    request.setOpt<curlpp::options::Url>(ss.str());
-    //request.setOpt<curlpp::options::UserAgent>("curlpp / 0.8.1 :)");
-    request.setOpt<curlpp::options::MaxRedirs>(10);
-    request.setOpt<curlpp::options::FollowLocation>(true);
-    request.setOpt<curlpp::options::Verbose>(false);
-
-    ss.str({});
-    ss.clear();
-    request.setOpt<curlpp::options::WriteStream>(&ss);
-
-    request.perform();
-
-    {
-        std::ofstream out(L"VaporwaveAesthetics.json",
-                          std::ofstream::trunc);
-
-        if (out.is_open())
-        {
-            out << ss.str();
-        }
-    }
-
-    try
-    {
-        return json::parse(ss);
-    }
-    catch (json::parse_error& e)
-    {
-        cout << "❌ " << e.what() << endl;
-        cout << "Downloaded json:" << endl;
-        cout << ss.str() << endl;
-        return {};
-    }
-}
+void run_test();
 
 string get_after_from_file()
 {
@@ -84,7 +33,8 @@ string get_after_from_file()
 
 void save_after_to_file(const string& after)
 {
-    std::ofstream ofs(L"after.txt", std::ofstream::trunc);
+    std::ofstream ofs(L"after.txt",
+                      std::ofstream::trunc);
 
     if (ofs.is_open())
     {
@@ -92,37 +42,119 @@ void save_after_to_file(const string& after)
     }
 }
 
-void download_file_to_disk(const wstring& url, wstring dest_filepath)
+
+struct Response
 {
+    string content;
+    long code;
+};
+
+optional<Response> perform_request(const string& url)
+{
+    // Our request to be sent.
     curlpp::Easy request;
 
-    request.setOpt<curlpp::options::Url>(Utils::ConvertWideToUtf8(url));
-    //request.setOpt<curlpp::options::UserAgent>("curlpp / 0.8.1 :)");
-    request.setOpt<curlpp::options::MaxRedirs>(10);
-    request.setOpt<curlpp::options::FollowLocation>(true);
-    request.setOpt<curlpp::options::Verbose>(false);
-
-    Utils::remove_invalid_charaters(dest_filepath);
-    dest_filepath = L"data\\" + dest_filepath + L"." + Utils::get_file_extension_from_url(url);
-
-    if (not fs::exists(L"data\\"))
-        fs::create_directory(L"data");
-
-    if (fs::exists(dest_filepath))
+    try
     {
-        wcout << L"[⚠️] file already downloaded, skipping... '" << dest_filepath << L"'" << endl;
-        return;
+
+        request.setOpt<curlpp::options::Url>(url);
+        //request.setOpt<curlpp::options::UserAgent>("curlpp / 0.8.1 :)");
+        request.setOpt<curlpp::options::FollowLocation>(true);
+        request.setOpt<curlpp::options::MaxRedirs>(10);
+        request.setOpt<curlpp::options::Verbose>(false);
+
+        std::stringstream ss;
+        request.setOpt<curlpp::options::WriteStream>(&ss);
+
+        request.perform();
+
+        auto code = curlpp::infos::ResponseCode::get(request);
+
+        return Response{ .content = ss.str(), .code = code };
+    }
+    catch (const curlpp::LibcurlRuntimeError& e)
+    {
+        wcout << L"[ERROR] perform_request() failed with code '"
+            << e.whatCode() << L"' "
+            << L": " << Utils::ConvertUtf8ToWide(e.what())
+            << endl;
+
+        return {};
+    }
+}
+
+optional<json> download_json_from_reddit(const string& after = "",
+                                         unsigned limit = 100)
+{
+    std::stringstream ss;
+    ss << "https://www.reddit.com";
+    ss << "/r/VaporwaveAesthetics";
+    ss << "/top.json";
+    ss << "?t=day"; // all
+    ss << "&limit=" << limit;
+
+    if (after != "")
+    {
+        ss << "&after=" << after;
     }
 
-    std::ofstream ofs(dest_filepath,
+    auto opt_resp = perform_request(ss.str());
+
+    if (!opt_resp.has_value())
+        return {};
+
+    auto& resp = opt_resp.value();
+
+    if (resp.code != 200)
+    {
+        wcout << L"[ERROR] Json request failed for url '"
+            << Utils::ConvertUtf8ToWide(ss.str()) << "'"
+            << L" with code: " << resp.code << endl;
+
+        return {};
+    }
+
+#ifdef _DEBUG 
+    // save json to disk for debug purposes 
+    {
+        std::ofstream out(L"VaporwaveAesthetics.json",
+                          std::ofstream::trunc |
+                          std::ofstream::binary);
+
+        if (out.is_open())
+        {
+            out << resp.content;
+        }
+    }
+#endif 
+
+    json j;
+
+    try
+    {
+        j = json::parse(resp.content);
+    }
+    catch (json::parse_error& e)
+    {
+        wcout << L"[ERROR] Cannot parse json for url '"
+            << Utils::ConvertUtf8ToWide(ss.str()) << L"'"
+            << L" : " << Utils::ConvertUtf8ToWide(e.what()) << endl;
+
+        return {};
+    }
+
+    return j;
+}
+
+void download_file_to_disk(const wstring& url, wstring path)
+{
+    std::ofstream ofs(path,
                       std::ofstream::binary |
                       std::ofstream::trunc);
 
     if (ofs.is_open())
     {
-        request.setOpt<curlpp::options::WriteStream>(&ofs);
-        request.perform();
-        
+        perform_request(); ldfkjsklfj
         // TODO: handle error code when resources not available...
         auto response_code = curlpp::infos::ResponseCode::get(request);
 
@@ -133,7 +165,7 @@ void download_file_to_disk(const wstring& url, wstring dest_filepath)
     }
     else
     {
-        wcout << L"[⚠️] cannot open file for writing '" << dest_filepath << L"'" << endl;
+        wcout << L"[⚠️] cannot open file for writing '" << path << L"'" << endl;
     }
 }
 
@@ -147,7 +179,7 @@ bool is_extension_allowed(const wstring& ext)
         L"bmp"
     };
 
-    return std::any_of(
+    bool res = std::any_of(
         allowed_ext.begin(),
         allowed_ext.end(),
         [&ext](const wstring& allowed_ext)
@@ -155,14 +187,11 @@ bool is_extension_allowed(const wstring& ext)
         return allowed_ext == ext;
     });
 
+    return res;
 }
 
 int program()
 {
-    SetConsoleOutputCP(CP_UTF8);
-    SetConsoleCP(CP_UTF8);
-    std::locale::global(std::locale("en_US.UTF-8")); // set the C++ and C locale
-
     try
     {
         // 
@@ -176,49 +205,77 @@ int program()
         curlpp::Cleanup cleanup;
 
         string after = get_after_from_file();
-        unsigned counter = 1;
+        unsigned counter = 0;
+
+        if (not fs::exists(L"data\\"))
+            fs::create_directory(L"data");
 
         while (true)
         {
             auto opt_json = download_json_from_reddit(after);
 
             if (!opt_json)
-                break; // sorry we can't continue
+                return 1;
 
-            auto json = opt_json.value();
+            auto& json = opt_json.value();
 
-            auto& children = json["data"]["children"];
+            if (not (json.contains("data") and
+                json["data"].contains("children")))
+            {
+                wcout << L"[ERROR] Unknown json content" << endl;
+                return 1;
+            }
+
+            const auto& children = json["data"]["children"];
 
             for (const auto& child : children)
             {
+                ++counter;
+
                 const auto& data = child["data"];
 
-                wstring title = Utils::ConvertUtf8ToWide(data["title"].get_ref<str_refc>());
-                wstring url = Utils::ConvertUtf8ToWide(data["url"].get_ref<str_refc>());
-                //const auto& id = data["id"].get_ref<str_refc>();
-                //const auto& domain = data["domain"].get_ref<str_refc>();
+                wstring raw_title = Utils::ConvertUtf8ToWide(data["title"].get_ref<str_cref>());
+                wstring url   = Utils::ConvertUtf8ToWide(data["url"].get_ref<str_cref>());
+                //const auto& id = data["id"].get_ref<str_cref>();
+                //const auto& domain = data["domain"].get_ref<str_cref>();
 
-                bool can_download = is_extension_allowed(Utils::get_file_extension_from_url(url));
+                auto ext_from_url = Utils::get_file_extension_from_url(url);
+
+                bool can_download = is_extension_allowed(ext_from_url);
                 //(data["is_video"] == false) and
                 //(data["domain"] == "i.redd.it");
 
-                std::wstring msg;
+                //wcout << L"[INFO] Downloading '" << raw_title << L"' ";
+                wcout << std::format(L"[{:04}] ", counter);
+
                 if (can_download)
                 {
-                    msg = std::format(L"[{}] - {} ( ✓ )",
-                                      counter++, title);
+                    auto filename = Utils::remove_invalid_charaters(raw_title);
+                    auto path = L"data/" + filename + L"." + ext_from_url;
 
-                    download_file_to_disk(url, title);
+                    wcout << std::format(L"Downloading '{}' ({}) to <{}> ", 
+                                         raw_title, url, path);
+
+                    if (fs::exists(path))
+                    {
+                        wcout << L"file already downloaded! skipping..." << endl;
+                        continue;
+                    }
+                    
+                    download_file_to_disk(url, path);
+                    //wcout << L"( ✓ )" << endl;
+                    wcout << L"( ✅ )" << endl;
                 }
                 else
                 {
-                    msg = std::format(L"[{}] - {} ( ❌ ) [{}]",
+                    wcout << std::format(L"Can't download url '{}' ( ❌ )", url) << endl;
+                    /*msg = std::format(L"[{}] - {} ( ❌ ) [{}]",
                                       counter++, title,
                                       std::wstring(url.begin(), url.end())
-                    );
+                    );*/
                 }
 
-                wcout << msg << endl;
+                //wcout << msg << endl;
 
                 using namespace std::chrono_literals;
                 std::this_thread::sleep_for(500ms);
@@ -229,6 +286,7 @@ int program()
                 wcout << "✅ All done!" << endl;
                 break;
             }
+
             after = json["data"]["after"].get<string>();
             save_after_to_file(after);
         }
@@ -243,7 +301,18 @@ int program()
     return 0;
 }
 
-int main_test()
+
+int wmain(int argc, wchar_t* argv[])
+{
+    SetConsoleCP(CP_UTF8);
+    SetConsoleOutputCP(CP_UTF8);
+    std::locale::global(std::locale("en_US.UTF-8")); // set the C++ and C locale
+
+    run_test();
+    return program();
+}
+
+void run_test()
 {
     assert(Utils::get_file_extension_from_url(L"https://i.imgur.com/gBj52nI.jpg") == L"jpg");
     assert(Utils::get_file_extension_from_url(L"https://i.imgur.com/gBj52nI") == L"");
@@ -254,12 +323,4 @@ int main_test()
     assert(is_extension_allowed(L"png"));
     assert(is_extension_allowed(L"bmp"));
     assert(not is_extension_allowed(L"mp4"));
-    return 0;
-}
-
-int main()
-{
-    main_test();
-    program();
-    return 0;
 }

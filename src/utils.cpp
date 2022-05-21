@@ -76,7 +76,7 @@ std::size_t replace_all(std::wstring& inout, std::wstring_view what, std::wstrin
     return count;
 }
 
-void remove_invalid_charaters(std::wstring& from)
+std::wstring remove_invalid_charaters(std::wstring from)
 {
     std::vector<wchar_t> invalid_chars =
     { L'<', L'>', L':', L'/', L'\\', L'|', L'?', L'*', L'"' };
@@ -93,6 +93,8 @@ void remove_invalid_charaters(std::wstring& from)
     std::replace_if(
         from.begin(), from.end(),
         replace_fn, L'_');
+
+    return from;
 
     //for (auto c : invalid_charaters)
     //{
