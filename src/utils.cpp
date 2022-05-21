@@ -76,4 +76,71 @@ std::size_t replace_all(std::wstring& inout, std::wstring_view what, std::wstrin
     return count;
 }
 
+void remove_invalid_charaters(std::wstring& from)
+{
+    std::vector<wchar_t> invalid_chars =
+    { L'<', L'>', L':', L'/', L'\\', L'|', L'?', L'*', L'"' };
+
+    auto replace_fn = [&ic = std::as_const(invalid_chars)](wchar_t c1)
+    {
+        auto any_fn = [&c1](wchar_t c2) {return c1 == c2; };
+
+        return std::any_of(
+            ic.begin(), ic.end(),
+            any_fn);
+    };
+
+    std::replace_if(
+        from.begin(), from.end(),
+        replace_fn, L'_');
+
+    //for (auto c : invalid_charaters)
+    //{
+    //    auto noSpaceEnd = std::remove(from.begin(), from.end(), c);
+    //    //from.erase(noSpaceEnd, from.end());
+    //    //std::replace(from.begin(), from.end(), c, L'_');
+    //}
+    //int k = 0;
+}
+
+std::wstring get_file_extension_from_url(const std::wstring& from)
+{
+    std::wstringstream buff;
+
+    bool found = false;
+
+    for (auto it = from.rbegin();
+        it != from.rend();
+        ++it)
+    {
+        if (*it != L'.')
+        {
+            if (*it == L'/' and
+                !found)
+            {
+                break; // no extension found
+            }
+            else
+            {
+                buff << *it;
+            }
+        }
+        else
+        {
+            found = true;
+            break;
+        }
+    }
+
+    if (!found)
+    {
+        return L"";
+    }
+
+    std::wstring ext = buff.str();
+    std::reverse(ext.begin(), ext.end());
+
+    return ext;
+}
+
 }

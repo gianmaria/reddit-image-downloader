@@ -15,4 +15,8 @@ std::wstring ConvertUtf8ToWide(const char* str);
 
 std::size_t replace_all(std::wstring& inout, std::wstring_view what, std::wstring_view with);
 
+void remove_invalid_charaters(std::wstring& from);
+
+std::wstring get_file_extension_from_url(const std::wstring& from);
+
 }

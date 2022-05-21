@@ -5,48 +5,67 @@ using std::wcout;
 using std::endl;
 using std::string;
 using std::wstring;
+using std::vector;
 
+namespace fs = std::filesystem;
 
 using json = nlohmann::json;
 using str_refc = const std::string&;
 
-json get_json_from_reddit(const string& after = "", unsigned limit = 10)
+// TODO: better error handling in general
+
+std::optional<json> download_json_from_reddit(const string& after = "",
+                                              unsigned limit = 100)
 {
+    std::stringstream ss;
+
     // Our request to be sent.
     curlpp::Easy request;
 
-    const string base_url = "https://www.reddit.com/r/VaporwaveAesthetics/top.json?t=all";
+    ss << "https://www.reddit.com/";
+    ss << "r/VaporwaveAesthetics/";
+    ss << "top.json";
+    ss << "?t=all";
+    ss << "&limit=" << limit;
 
-    string url;
     if (after != "")
-        url = std::format("{}&limit={}&after={}",
-        base_url, limit, after);
-    else
-        url = std::format("{}&limit={}",
-        base_url, limit);
+    {
+        ss << "&after=" << after;
+    }
 
-    request.setOpt<curlpp::options::Url>(url);
-    /*request.setOpt<curlpp::options::UserAgent>("stocazzo");
+    request.setOpt<curlpp::options::Url>(ss.str());
+    //request.setOpt<curlpp::options::UserAgent>("curlpp / 0.8.1 :)");
     request.setOpt<curlpp::options::MaxRedirs>(10);
-    request.setOpt<curlpp::options::FollowLocation>(true);*/
+    request.setOpt<curlpp::options::FollowLocation>(true);
     request.setOpt<curlpp::options::Verbose>(false);
 
-    std::stringstream ss;
+    ss.str({});
+    ss.clear();
     request.setOpt<curlpp::options::WriteStream>(&ss);
 
     request.perform();
 
-    return json::parse(ss.str());
+    {
+        std::ofstream out(L"VaporwaveAesthetics.json",
+                          std::ofstream::trunc);
 
-    //{
-//    std::ofstream out(L"VaporwaveAesthetics-top.json",
-//        std::ofstream::trunc);
+        if (out.is_open())
+        {
+            out << ss.str();
+        }
+    }
 
-//    if (out.is_open())
-//    {
-//        out << ss.rdbuf();
-//    }
-//}
+    try
+    {
+        return json::parse(ss);
+    }
+    catch (json::parse_error& e)
+    {
+        cout << "❌ " << e.what() << endl;
+        cout << "Downloaded json:" << endl;
+        cout << ss.str() << endl;
+        return {};
+    }
 }
 
 string get_after_from_file()
@@ -73,51 +92,72 @@ void save_after_to_file(const string& after)
     }
 }
 
-void download_file(const string& url, const string& dest_file)
+void download_file_to_disk(const wstring& url, wstring dest_filepath)
 {
-    auto get_extension = [](const string& from)
-    {
-        std::stringstream buff;
-
-        for (auto it = from.rbegin();
-            it != from.rend();
-            ++it)
-        {
-            if (*it != '.')
-                buff << *it;
-            else
-                break;
-        }
-
-        string ext = buff.str();
-        std::reverse(ext.begin(), ext.end());
-        return ext;
-    };
-
     curlpp::Easy request;
 
-    request.setOpt<curlpp::options::Url>(url);
+    request.setOpt<curlpp::options::Url>(Utils::ConvertWideToUtf8(url));
+    //request.setOpt<curlpp::options::UserAgent>("curlpp / 0.8.1 :)");
+    request.setOpt<curlpp::options::MaxRedirs>(10);
+    request.setOpt<curlpp::options::FollowLocation>(true);
     request.setOpt<curlpp::options::Verbose>(false);
 
-    wstring w_dest_file = Utils::ConvertUtf8ToWide(dest_file);
-    w_dest_file += L"." + Utils::ConvertUtf8ToWide(get_extension(url));
+    Utils::remove_invalid_charaters(dest_filepath);
+    dest_filepath = L"data\\" + dest_filepath + L"." + Utils::get_file_extension_from_url(url);
 
-    std::ofstream ofs(w_dest_file,
-        std::ofstream::binary |
-        std::ofstream::trunc);
+    if (not fs::exists(L"data\\"))
+        fs::create_directory(L"data");
+
+    if (fs::exists(dest_filepath))
+    {
+        wcout << L"[⚠️] file already downloaded, skipping... '" << dest_filepath << L"'" << endl;
+        return;
+    }
+
+    std::ofstream ofs(dest_filepath,
+                      std::ofstream::binary |
+                      std::ofstream::trunc);
 
     if (ofs.is_open())
     {
         request.setOpt<curlpp::options::WriteStream>(&ofs);
         request.perform();
+        
+        // TODO: handle error code when resources not available...
+        auto response_code = curlpp::infos::ResponseCode::get(request);
+
+        if (response_code != 200)
+        {
+            throw std::runtime_error("Response code is: " + std::to_string(response_code));
+        }
     }
     else
     {
-        cout << "[WARN] cannot download file: " << url << endl;
+        wcout << L"[⚠️] cannot open file for writing '" << dest_filepath << L"'" << endl;
     }
 }
 
-int main(int, char**)
+bool is_extension_allowed(const wstring& ext)
+{
+    const vector<wstring> allowed_ext{
+        L"gif",
+        L"jpeg",
+        L"png",
+        L"jpg",
+        L"bmp"
+    };
+
+    return std::any_of(
+        allowed_ext.begin(),
+        allowed_ext.end(),
+        [&ext](const wstring& allowed_ext)
+    {
+        return allowed_ext == ext;
+    });
+
+}
+
+int program()
 {
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
@@ -125,7 +165,7 @@ int main(int, char**)
 
     try
     {
-
+        // 
         // get json file from r/VaporwaveAesthetics
         // save 'after' value to file
         // print all the title
@@ -140,11 +180,12 @@ int main(int, char**)
 
         while (true)
         {
-            auto json = get_json_from_reddit(after);
+            auto opt_json = download_json_from_reddit(after);
 
-            after = json["data"]["after"].get<string>();
+            if (!opt_json)
+                break; // sorry we can't continue
 
-            save_after_to_file(after);
+            auto json = opt_json.value();
 
             auto& children = json["data"]["children"];
 
@@ -152,33 +193,44 @@ int main(int, char**)
             {
                 const auto& data = child["data"];
 
-                const auto& title = data["title"].get_ref<str_refc>();
-                const auto& url = data["url"].get_ref<str_refc>();
+                wstring title = Utils::ConvertUtf8ToWide(data["title"].get_ref<str_refc>());
+                wstring url = Utils::ConvertUtf8ToWide(data["url"].get_ref<str_refc>());
                 //const auto& id = data["id"].get_ref<str_refc>();
-                const auto& domain = data["domain"].get_ref<str_refc>();
+                //const auto& domain = data["domain"].get_ref<str_refc>();
 
-                bool can_download =
-                    (data["is_video"] == false) and
-                    (data["domain"] == "i.redd.it");
+                bool can_download = is_extension_allowed(Utils::get_file_extension_from_url(url));
+                //(data["is_video"] == false) and
+                //(data["domain"] == "i.redd.it");
 
                 std::wstring msg;
                 if (can_download)
                 {
                     msg = std::format(L"[{}] - {} ( ✓ )",
-                        counter++, Utils::ConvertUtf8ToWide(title));
+                                      counter++, title);
 
-                    download_file(url, title);
+                    download_file_to_disk(url, title);
                 }
                 else
                 {
                     msg = std::format(L"[{}] - {} ( ❌ ) [{}]",
-                        counter++, Utils::ConvertUtf8ToWide(title),
-                        std::wstring(url.begin(), url.end())
+                                      counter++, title,
+                                      std::wstring(url.begin(), url.end())
                     );
                 }
 
                 wcout << msg << endl;
+
+                using namespace std::chrono_literals;
+                std::this_thread::sleep_for(500ms);
             }
+
+            if (json["data"]["after"].is_null())
+            {
+                wcout << "✅ All done!" << endl;
+                break;
+            }
+            after = json["data"]["after"].get<string>();
+            save_after_to_file(after);
         }
 
     }
@@ -191,3 +243,23 @@ int main(int, char**)
     return 0;
 }
 
+int main_test()
+{
+    assert(Utils::get_file_extension_from_url(L"https://i.imgur.com/gBj52nI.jpg") == L"jpg");
+    assert(Utils::get_file_extension_from_url(L"https://i.imgur.com/gBj52nI") == L"");
+    assert(Utils::get_file_extension_from_url(L"https://gfycat.com/MeekWeightyFrogmouth") == L"");
+    assert(Utils::get_file_extension_from_url(L"https://66.media.tumblr.com/8ead6e96ca8e3e8fe16434181e8a1493/tumblr_oruoo12vtR1s5qhggo3_1280.png") == L"png");
+
+    // gif, jpeg, png, jpg, bmp
+    assert(is_extension_allowed(L"png"));
+    assert(is_extension_allowed(L"bmp"));
+    assert(not is_extension_allowed(L"mp4"));
+    return 0;
+}
+
+int main()
+{
+    main_test();
+    program();
+    return 0;
+}
