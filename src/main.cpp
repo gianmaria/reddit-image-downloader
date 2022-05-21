@@ -28,9 +28,9 @@ struct Response
 
 void run_test();
 
-string get_after_from_file()
+string get_after_from_file(const wstring& from)
 {
-    std::ifstream ifs(L"after.txt");
+    std::ifstream ifs(from + L"/after.txt");
 
     string after;
 
@@ -42,14 +42,15 @@ string get_after_from_file()
     return after;
 }
 
-void save_after_to_file(const string& after)
+void save_after_to_file(const wstring& where,
+                        const string& content)
 {
-    std::ofstream ofs(L"after.txt",
+    std::ofstream ofs(where + L"/after.txt",
                       std::ofstream::trunc);
 
     if (ofs.is_open())
     {
-        ofs << after;
+        ofs << content;
     }
 }
 
@@ -221,7 +222,7 @@ int rid(const string& subreddit,
 
         curlpp::Cleanup cleanup;
         
-        string after = get_after_from_file();
+        string after = get_after_from_file(dest_folder);
 
         if (not fs::exists(dest_folder))
         {
@@ -320,7 +321,7 @@ int rid(const string& subreddit,
             }
 
             after = json["data"]["after"].get<string>();
-            save_after_to_file(after);
+            save_after_to_file(dest_folder, after);
         }
 
     }
@@ -335,6 +336,8 @@ int rid(const string& subreddit,
     return 0;
 }
 
+
+
 // rid.exe VaporwaveAesthetics "top" [hour | day | week | month | year | all] where
 int wmain(int argc, wchar_t* argv[])
 {
@@ -344,7 +347,9 @@ int wmain(int argc, wchar_t* argv[])
 
     run_test();
 
-#ifdef _DEBUG
+#define TESTING 0
+
+#if TESTING
     
     const string subreddit = "pics"; // "VaporwaveAesthetics";
     const string when = "month"; // "day"; 
