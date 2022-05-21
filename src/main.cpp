@@ -13,7 +13,18 @@ namespace fs = std::filesystem;
 using json = nlohmann::json;
 using str_cref = const std::string&;
 
-// TODO: better error handling in general
+// TODO: 
+// [] multithreading
+// [] download images inside a gallery!
+
+
+const size_t g_FILENAME_MAX_LEN = 180;
+
+struct Response
+{
+    string content;
+    long code;
+};
 
 void run_test();
 
@@ -42,27 +53,22 @@ void save_after_to_file(const string& after)
     }
 }
 
-
-struct Response
-{
-    string content;
-    long code;
-};
-
 optional<Response> perform_request(const string& url)
 {
     curlpp::Easy request;
-
+    
     try
     {
-        request.setOpt<curlpp::options::Url>(url);
-        //request.setOpt<curlpp::options::UserAgent>("curlpp / 0.8.1 :)");
-        request.setOpt<curlpp::options::FollowLocation>(true);
-        request.setOpt<curlpp::options::MaxRedirs>(10);
-        request.setOpt<curlpp::options::Verbose>(false);
+        using namespace curlpp::options;
+
+        request.setOpt<Url>(url);
+        //request.setOpt<UserAgent>("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36");
+        request.setOpt<FollowLocation>(true);
+        request.setOpt<MaxRedirs>(10);
+        request.setOpt<Verbose>(false);
 
         std::stringstream ss;
-        request.setOpt<curlpp::options::WriteStream>(&ss);
+        request.setOpt<WriteStream>(&ss);
 
         request.perform();
 
@@ -87,19 +93,20 @@ optional<json> download_json_from_reddit(
     const string& after = "",
     unsigned limit = 100)
 {
-    std::stringstream url;
-    url << "https://www.reddit.com";
-    url << "/r/" << subreddit;
-    url << "/top.json";
-    url << "?t=" << when;
-    url << "&limit=" << limit;
+    std::stringstream reddit_url;
+    reddit_url << "https://www.reddit.com";
+    reddit_url << "/r/" << subreddit;
+    reddit_url << "/top.json";
+    reddit_url << "?t=" << when;
+    reddit_url << "&raw_json=1";
+    reddit_url << "&limit=" << limit;
 
     if (after != "")
     {
-        url << "&after=" << after;
+        reddit_url << "&after=" << after;
     }
 
-    auto opt_resp = perform_request(url.str());
+    auto opt_resp = perform_request(reddit_url.str());
 
     if (!opt_resp.has_value())
         return {};
@@ -109,7 +116,7 @@ optional<json> download_json_from_reddit(
     if (resp.code != 200)
     {
         wcout << L"[ERROR] Json request failed for url '"
-            << Utils::ConvertUtf8ToWide(url.str()) << "'"
+            << Utils::ConvertUtf8ToWide(reddit_url.str()) << "'"
             << L" with code: " << resp.code << endl;
 
         return {};
@@ -118,7 +125,7 @@ optional<json> download_json_from_reddit(
 #ifdef _DEBUG 
     // save json to disk for debug purposes 
     {
-        std::ofstream out(L"VaporwaveAesthetics.json",
+        std::ofstream out(subreddit + "_" + when + "_" + after + ".json",
                           std::ofstream::trunc |
                           std::ofstream::binary);
 
@@ -138,7 +145,7 @@ optional<json> download_json_from_reddit(
     catch (json::parse_error& e)
     {
         wcout << L"[ERROR] Cannot parse json for url '"
-            << Utils::ConvertUtf8ToWide(url.str()) << L"'"
+            << Utils::ConvertUtf8ToWide(reddit_url.str()) << L"'"
             << L" : " << Utils::ConvertUtf8ToWide(e.what()) << endl;
 
         return {};
@@ -213,7 +220,7 @@ int rid(const string& subreddit,
         // get json file from r/VaporwaveAesthetics with after value
 
         curlpp::Cleanup cleanup;
-
+        
         string after = get_after_from_file();
 
         if (not fs::exists(dest_folder))
@@ -266,13 +273,16 @@ int rid(const string& subreddit,
                 //wcout << L"[INFO] Downloading '" << raw_title << L"' ";
                 wcout << std::format(L"[{:04}] ", counter);
 
+                auto filename = Utils::remove_invalid_charaters(raw_title);
+                if (filename.length() > g_FILENAME_MAX_LEN)
+                    filename.resize(g_FILENAME_MAX_LEN);
+
                 if (can_download)
                 {
-                    auto filename = Utils::remove_invalid_charaters(raw_title);
                     auto path = dest_folder + L"/" + filename + L"." + ext_from_url;
 
                     wcout << std::format(L"Downloading '{}' ({}) to <{}> ", 
-                                         raw_title, url, path);
+                                         filename, url, path);
 
                     if (fs::exists(path))
                     {
@@ -294,11 +304,12 @@ int rid(const string& subreddit,
                 }
                 else
                 {
-                    wcout << std::format(L"Can't download url '{}' ( ❌ )", url) << endl;
+                    wcout << std::format(L"Cannot download '{}' url '{}' ( ❌ )", 
+                                         filename, url) << endl;
                 }
 
                 using namespace std::chrono_literals;
-                std::this_thread::sleep_for(800ms);
+                std::this_thread::sleep_for(100ms);
             }
 
             if (json["data"]["after"].is_null())
@@ -333,6 +344,14 @@ int wmain(int argc, wchar_t* argv[])
 
     run_test();
 
+#ifdef _DEBUG
+    
+    const string subreddit = "pics"; // "VaporwaveAesthetics";
+    const string when = "month"; // "day"; 
+    const wstring dest = L"picssssz"; // L"🌟vaporwave-aesthetics🌟";
+
+    return rid(subreddit, when, dest);
+#else
     if (argc != 4)
     {
         wcout << L"Bro i need 3 parameter..." << endl;
@@ -344,6 +363,7 @@ int wmain(int argc, wchar_t* argv[])
     const wstring dest = argv[3]; // L"🌟vaporwave-aesthetics🌟";
 
     return rid(subreddit, when, dest);
+#endif
 }
 
 void run_test()
@@ -357,4 +377,17 @@ void run_test()
     assert(is_extension_allowed(L"png"));
     assert(is_extension_allowed(L"bmp"));
     assert(not is_extension_allowed(L"mp4"));
+
+    //auto long_title = 
+    //    L"Weekly vinyl rip is LIVE: This week, A class in​​.​​​.​​​. ​​CRYPTO CURRENCY "
+    //    L"by 猫 シ Corp. released as 7\" by Geometric Lullaby in 2021!8 tracks of "
+    //    L"classic mallsoft in just under 16 minutes!Link in comments < 3";
+    //
+    //auto clean_title = Utils::remove_invalid_charaters(long_title);
+
+    //auto len = clean_title.length();
+
+    //auto url = "https://external-preview.redd.it/kGZO86rtKFwRNHxTuQaPOE3XBAVwvPhXjVzZEyLntB8.jpg?auto=webp\\u0026s=8c6c31b828bbc706749dabe3ab6b3a0439480421";
+
+    int stop = 0;
 }
