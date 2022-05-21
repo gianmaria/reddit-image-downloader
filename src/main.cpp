@@ -51,12 +51,10 @@ struct Response
 
 optional<Response> perform_request(const string& url)
 {
-    // Our request to be sent.
     curlpp::Easy request;
 
     try
     {
-
         request.setOpt<curlpp::options::Url>(url);
         //request.setOpt<curlpp::options::UserAgent>("curlpp / 0.8.1 :)");
         request.setOpt<curlpp::options::FollowLocation>(true);
@@ -74,31 +72,34 @@ optional<Response> perform_request(const string& url)
     }
     catch (const curlpp::LibcurlRuntimeError& e)
     {
-        wcout << L"[ERROR] perform_request() failed with code '"
-            << e.whatCode() << L"' "
-            << L": " << Utils::ConvertUtf8ToWide(e.what())
+        wcout <<
+            std::format(L"[ERROR] perform_request() failed with code {}: \"{}\"",
+                        static_cast<int>(e.whatCode()), Utils::ConvertUtf8ToWide(e.what()) )
             << endl;
 
         return {};
     }
 }
 
-optional<json> download_json_from_reddit(const string& after = "",
-                                         unsigned limit = 100)
+optional<json> download_json_from_reddit(
+    const string& subreddit,
+    const string& when,
+    const string& after = "",
+    unsigned limit = 100)
 {
-    std::stringstream ss;
-    ss << "https://www.reddit.com";
-    ss << "/r/VaporwaveAesthetics";
-    ss << "/top.json";
-    ss << "?t=day"; // all
-    ss << "&limit=" << limit;
+    std::stringstream url;
+    url << "https://www.reddit.com";
+    url << "/r/" << subreddit;
+    url << "/top.json";
+    url << "?t=" << when;
+    url << "&limit=" << limit;
 
     if (after != "")
     {
-        ss << "&after=" << after;
+        url << "&after=" << after;
     }
 
-    auto opt_resp = perform_request(ss.str());
+    auto opt_resp = perform_request(url.str());
 
     if (!opt_resp.has_value())
         return {};
@@ -108,7 +109,7 @@ optional<json> download_json_from_reddit(const string& after = "",
     if (resp.code != 200)
     {
         wcout << L"[ERROR] Json request failed for url '"
-            << Utils::ConvertUtf8ToWide(ss.str()) << "'"
+            << Utils::ConvertUtf8ToWide(url.str()) << "'"
             << L" with code: " << resp.code << endl;
 
         return {};
@@ -137,7 +138,7 @@ optional<json> download_json_from_reddit(const string& after = "",
     catch (json::parse_error& e)
     {
         wcout << L"[ERROR] Cannot parse json for url '"
-            << Utils::ConvertUtf8ToWide(ss.str()) << L"'"
+            << Utils::ConvertUtf8ToWide(url.str()) << L"'"
             << L" : " << Utils::ConvertUtf8ToWide(e.what()) << endl;
 
         return {};
@@ -198,12 +199,15 @@ bool is_extension_allowed(const wstring& ext)
     return res;
 }
 
-int program()
+// reddit image downloader
+int rid(const string& subreddit,
+        const string& when,
+        const wstring& dest_folder)
 {
     try
     {
         // 
-        // get json file from r/VaporwaveAesthetics
+        // get json file from r/$subreddit
         // save 'after' value to file
         // print all the title
         // get json file from r/VaporwaveAesthetics with after value
@@ -212,14 +216,21 @@ int program()
 
         string after = get_after_from_file();
 
-        if (not fs::exists(L"data\\"))
-            fs::create_directory(L"data");
+        if (not fs::exists(dest_folder))
+        {
+            if (not fs::create_directory(dest_folder))
+            {
+                wcout << std::format(L"[ERROR] Cannot create folder <{}>", dest_folder) << endl;
+                return 1;
+            }
+        }
 
         unsigned counter = 0;
 
         while (true)
         {
-            auto opt_json = download_json_from_reddit(after);
+            auto opt_json = download_json_from_reddit(subreddit, when,
+                                                      after);
 
             if (!opt_json)
                 return 1;
@@ -258,7 +269,7 @@ int program()
                 if (can_download)
                 {
                     auto filename = Utils::remove_invalid_charaters(raw_title);
-                    auto path = L"data/" + filename + L"." + ext_from_url;
+                    auto path = dest_folder + L"/" + filename + L"." + ext_from_url;
 
                     wcout << std::format(L"Downloading '{}' ({}) to <{}> ", 
                                          raw_title, url, path);
@@ -313,7 +324,7 @@ int program()
     return 0;
 }
 
-
+// rid.exe VaporwaveAesthetics "top" [hour | day | week | month | year | all] where
 int wmain(int argc, wchar_t* argv[])
 {
     SetConsoleCP(CP_UTF8);
@@ -321,7 +332,18 @@ int wmain(int argc, wchar_t* argv[])
     std::locale::global(std::locale("en_US.UTF-8")); // set the C/C++ locale
 
     run_test();
-    return program();
+
+    if (argc != 4)
+    {
+        wcout << L"Bro i need 3 parameter..." << endl;
+        return 1;
+    }
+
+    const string subreddit = Utils::ConvertWideToUtf8(argv[1]); // "VaporwaveAesthetics";
+    const string when = Utils::ConvertWideToUtf8(argv[2]); // "day"; 
+    const wstring dest = argv[3]; // L"🌟vaporwave-aesthetics🌟";
+
+    return rid(subreddit, when, dest);
 }
 
 void run_test()
