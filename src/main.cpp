@@ -146,7 +146,8 @@ optional<json> download_json_from_reddit(const string& after = "",
     return j;
 }
 
-void download_file_to_disk(const wstring& url, wstring path)
+bool download_file_to_disk(const wstring& url, 
+                           const wstring& path)
 {
     std::ofstream ofs(path,
                       std::ofstream::binary |
@@ -154,19 +155,26 @@ void download_file_to_disk(const wstring& url, wstring path)
 
     if (ofs.is_open())
     {
-        perform_request(); ldfkjsklfj
-        // TODO: handle error code when resources not available...
-        auto response_code = curlpp::infos::ResponseCode::get(request);
+        auto opt_res = perform_request(Utils::ConvertWideToUtf8(url));
 
-        if (response_code != 200)
+        if (not opt_res.has_value())
         {
-            throw std::runtime_error("Response code is: " + std::to_string(response_code));
+            wcout << std::format(L"[ERROR] Failed to download url '{}' to <{}>",
+                                 url, path) << endl;
+            return false;
         }
+
+        auto& res = opt_res.value();
+
+        ofs << res.content;
     }
     else
     {
-        wcout << L"[⚠️] cannot open file for writing '" << path << L"'" << endl;
+        wcout << std::format(L"[WARN] Cannot open file for writing <{}>", path) << endl;
+        return false;
     }
+
+    return true;
 }
 
 bool is_extension_allowed(const wstring& ext)
@@ -200,15 +208,14 @@ int program()
         // print all the title
         // get json file from r/VaporwaveAesthetics with after value
 
-        // 
-        // That's all that is needed to do cleanup of used resources (RAII style).
         curlpp::Cleanup cleanup;
 
         string after = get_after_from_file();
-        unsigned counter = 0;
 
         if (not fs::exists(L"data\\"))
             fs::create_directory(L"data");
+
+        unsigned counter = 0;
 
         while (true)
         {
@@ -222,7 +229,7 @@ int program()
             if (not (json.contains("data") and
                 json["data"].contains("children")))
             {
-                wcout << L"[ERROR] Unknown json content" << endl;
+                wcout << L"[ERROR] Unexpected json content... 😳" << endl;
                 return 1;
             }
 
@@ -262,28 +269,31 @@ int program()
                         continue;
                     }
                     
-                    download_file_to_disk(url, path);
-                    //wcout << L"( ✓ )" << endl;
-                    wcout << L"( ✅ )" << endl;
+                    auto success = download_file_to_disk(url, path);
+
+                    if (success)
+                    {
+                        wcout << L"( ✅ )" << endl;
+                        //wcout << L"( ✓ )" << endl;
+                    }
+                    else
+                    {
+                        wcout << L"( 🛑 )" << endl;
+                    }
                 }
                 else
                 {
                     wcout << std::format(L"Can't download url '{}' ( ❌ )", url) << endl;
-                    /*msg = std::format(L"[{}] - {} ( ❌ ) [{}]",
-                                      counter++, title,
-                                      std::wstring(url.begin(), url.end())
-                    );*/
                 }
 
-                //wcout << msg << endl;
-
                 using namespace std::chrono_literals;
-                std::this_thread::sleep_for(500ms);
+                std::this_thread::sleep_for(800ms);
             }
 
             if (json["data"]["after"].is_null())
             {
-                wcout << "✅ All done!" << endl;
+                // nothing left do do, leaving
+                wcout << "All done!" << endl;
                 break;
             }
 
@@ -292,9 +302,11 @@ int program()
         }
 
     }
-    catch (std::exception& e)
+    catch (const std::exception& e)
     {
-        cout << "[EXC]: " << e.what() << endl;
+        cout << "\n\n---" << endl;
+        cout << "[EXCEPTION]: " << e.what() << endl;
+        cout << "---\n\n" << endl;
         int stop_here = 0;
     }
 
@@ -306,7 +318,7 @@ int wmain(int argc, wchar_t* argv[])
 {
     SetConsoleCP(CP_UTF8);
     SetConsoleOutputCP(CP_UTF8);
-    std::locale::global(std::locale("en_US.UTF-8")); // set the C++ and C locale
+    std::locale::global(std::locale("en_US.UTF-8")); // set the C/C++ locale
 
     run_test();
     return program();
