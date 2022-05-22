@@ -57,7 +57,7 @@ void save_after_to_file(const wstring& where,
 optional<Response> perform_request(const string& url)
 {
     curlpp::Easy request;
-    
+
     try
     {
         using namespace curlpp::options;
@@ -81,14 +81,14 @@ optional<Response> perform_request(const string& url)
     {
         wcout <<
             std::format(L"[ERROR] perform_request() failed with code {}: \"{}\"",
-                        static_cast<int>(e.whatCode()), Utils::ConvertUtf8ToWide(e.what()) )
+                        static_cast<int>(e.whatCode()), Utils::ConvertUtf8ToWide(e.what()))
             << endl;
 
         return {};
     }
 }
 
-optional<json> download_json_from_reddit(
+optional<string> download_json_from_reddit(
     const string& subreddit,
     const string& when,
     const string& after = "",
@@ -116,46 +116,16 @@ optional<json> download_json_from_reddit(
 
     if (resp.code != 200)
     {
-        wcout << L"[ERROR] Json request failed for url '"
-            << Utils::ConvertUtf8ToWide(reddit_url.str()) << "'"
-            << L" with code: " << resp.code << endl;
-
+        wcout << std::format(L"[ERROR] Json request failed for url {} with code: {}",
+                             Utils::ConvertUtf8ToWide(reddit_url.str()), resp.code)
+            << endl;
         return {};
     }
 
-#ifdef _DEBUG 
-    // save json to disk for debug purposes 
-    {
-        std::ofstream out(subreddit + "_" + when + "_" + after + ".json",
-                          std::ofstream::trunc |
-                          std::ofstream::binary);
-
-        if (out.is_open())
-        {
-            out << resp.content;
-        }
-    }
-#endif 
-
-    json j;
-
-    try
-    {
-        j = json::parse(resp.content);
-    }
-    catch (json::parse_error& e)
-    {
-        wcout << L"[ERROR] Cannot parse json for url '"
-            << Utils::ConvertUtf8ToWide(reddit_url.str()) << L"'"
-            << L" : " << Utils::ConvertUtf8ToWide(e.what()) << endl;
-
-        return {};
-    }
-
-    return j;
+    return resp.content;
 }
 
-bool download_file_to_disk(const wstring& url, 
+bool download_file_to_disk(const wstring& url,
                            const wstring& path)
 {
     std::ofstream ofs(path,
@@ -221,7 +191,7 @@ int rid(const string& subreddit,
         // get json file from r/VaporwaveAesthetics with after value
 
         curlpp::Cleanup cleanup;
-        
+
         string after = get_after_from_file(dest_folder);
 
         if (not fs::exists(dest_folder))
@@ -237,13 +207,40 @@ int rid(const string& subreddit,
 
         while (true)
         {
-            auto opt_json = download_json_from_reddit(subreddit, when,
+            auto opt_resp = download_json_from_reddit(subreddit, when,
                                                       after);
 
-            if (!opt_json)
+            if (!opt_resp)
                 return 1;
 
-            auto& json = opt_json.value();
+            auto& resp = opt_resp.value();
+
+#ifdef _DEBUG 
+            // save json to disk for debugging purposes 
+            {
+                std::ofstream out(subreddit + "_" + when + "_" + after + ".json",
+                                  std::ofstream::trunc |
+                                  std::ofstream::binary);
+
+                if (out.is_open())
+                {
+                    out << resp;
+                }
+            }
+#endif 
+
+            json json;
+
+            try
+            {
+                json = json::parse(resp);
+            }
+            catch (json::parse_error& e)
+            {
+                wcout << std::format(L"[ERROR] Cannot parse downloaded json from reddit.com: {}",
+                                     Utils::ConvertUtf8ToWide(e.what()));
+                return 1;
+            }
 
             if (not (json.contains("data") and
                 json["data"].contains("children")))
@@ -261,7 +258,7 @@ int rid(const string& subreddit,
                 const auto& data = child["data"];
 
                 wstring raw_title = Utils::ConvertUtf8ToWide(data["title"].get_ref<str_cref>());
-                wstring url   = Utils::ConvertUtf8ToWide(data["url"].get_ref<str_cref>());
+                wstring url = Utils::ConvertUtf8ToWide(data["url"].get_ref<str_cref>());
                 //const auto& id = data["id"].get_ref<str_cref>();
                 //const auto& domain = data["domain"].get_ref<str_cref>();
 
@@ -282,7 +279,7 @@ int rid(const string& subreddit,
                 {
                     auto path = dest_folder + L"/" + filename + L"." + ext_from_url;
 
-                    wcout << std::format(L"Downloading '{}' ({}) to <{}> ", 
+                    wcout << std::format(L"Downloading '{}' ({}) to <{}> ",
                                          filename, url, path);
 
                     if (fs::exists(path))
@@ -290,7 +287,7 @@ int rid(const string& subreddit,
                         wcout << L"file already downloaded! skipping..." << endl;
                         continue;
                     }
-                    
+
                     auto success = download_file_to_disk(url, path);
 
                     if (success)
@@ -305,7 +302,7 @@ int rid(const string& subreddit,
                 }
                 else
                 {
-                    wcout << std::format(L"Cannot download '{}' url '{}' ( ❌ )", 
+                    wcout << std::format(L"Cannot download '{}' url '{}' ( ❌ )",
                                          filename, url) << endl;
                 }
 
@@ -315,7 +312,7 @@ int rid(const string& subreddit,
 
             if (json["data"]["after"].is_null())
             {
-                // nothing left do do, leaving
+                // nothing left do do, we download everything
                 wcout << "All done!" << endl;
                 break;
             }
@@ -350,7 +347,7 @@ int wmain(int argc, wchar_t* argv[])
 #define TESTING 0
 
 #if TESTING
-    
+
     const string subreddit = "pics"; // "VaporwaveAesthetics";
     const string when = "month"; // "day"; 
     const wstring dest = L"picssssz"; // L"🌟vaporwave-aesthetics🌟";
@@ -361,7 +358,7 @@ int wmain(int argc, wchar_t* argv[])
     {
         wcout << L"Bro i need 3 parameter..." << endl;
         return 1;
-    }
+}
 
     const string subreddit = Utils::ConvertWideToUtf8(argv[1]); // "VaporwaveAesthetics";
     const string when = Utils::ConvertWideToUtf8(argv[2]); // "day"; 
