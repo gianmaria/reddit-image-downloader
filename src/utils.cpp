@@ -2,6 +2,8 @@
 
 namespace Utils
 {
+#if 0
+
 std::string ConvertWideToUtf8(const std::wstring& str)
 {
     LPCWCH data_ = reinterpret_cast<LPCWCH>(str.data());
@@ -33,12 +35,12 @@ std::wstring ConvertUtf8ToWide(const char8_t* data, size_t size)
     LPCCH data_ = reinterpret_cast<LPCCH>(data);
 
     int count = MultiByteToWideChar(CP_UTF8, 0,
-        data_, size, NULL, 0);
+                                    data_, size, NULL, 0);
 
     std::wstring wstr(count, 0);
 
     int res = MultiByteToWideChar(CP_UTF8, 0,
-        data_, size, &wstr[0], count);
+                                  data_, size, &wstr[0], count);
 
     return wstr;
 }
@@ -64,10 +66,12 @@ std::wstring ConvertUtf8ToWide(const char* str)
         static_cast<size_t>(strlen(str)));
 }
 
-std::size_t replace_all(std::wstring& inout, std::wstring_view what, std::wstring_view with)
+#endif // 0
+
+std::size_t replace_all(std::string& inout, std::string_view what, std::string_view with)
 {
     std::size_t count{};
-    for (std::wstring::size_type pos{};
+    for (std::string::size_type pos{};
         inout.npos != (pos = inout.find(what.data(), pos, what.length()));
         pos += with.length(), ++count)
     {
@@ -76,14 +80,14 @@ std::size_t replace_all(std::wstring& inout, std::wstring_view what, std::wstrin
     return count;
 }
 
-std::wstring remove_invalid_charaters(std::wstring from)
+std::string remove_invalid_charaters(std::string from)
 {
-    std::vector<wchar_t> invalid_chars =
-    { L'<', L'>', L':', L'/', L'\\', L'|', L'?', L'*', L'"' };
+    std::vector<char> invalid_chars =
+    { '<', '>', ':', '/', '\\', '|', '?', '*', '"' };
 
-    auto replace_fn = [&ic = std::as_const(invalid_chars)](wchar_t c1)
+    auto replace_fn = [&ic = std::as_const(invalid_chars)](char c1)
     {
-        auto any_fn = [&c1](wchar_t c2) {return c1 == c2; };
+        auto any_fn = [&c1](char c2) {return c1 == c2; };
 
         return std::any_of(
             ic.begin(), ic.end(),
@@ -92,7 +96,7 @@ std::wstring remove_invalid_charaters(std::wstring from)
 
     std::replace_if(
         from.begin(), from.end(),
-        replace_fn, L'_');
+        replace_fn, '_');
 
     return from;
 
@@ -100,14 +104,14 @@ std::wstring remove_invalid_charaters(std::wstring from)
     //{
     //    auto noSpaceEnd = std::remove(from.begin(), from.end(), c);
     //    //from.erase(noSpaceEnd, from.end());
-    //    //std::replace(from.begin(), from.end(), c, L'_');
+    //    //std::replace(from.begin(), from.end(), c, '_');
     //}
     //int k = 0;
 }
 
-std::wstring get_file_extension_from_url(const std::wstring& from)
+std::string get_file_extension_from_url(const std::string& from)
 {
-    std::wstringstream buff;
+    std::stringstream buff;
 
     bool found = false;
 
@@ -115,9 +119,9 @@ std::wstring get_file_extension_from_url(const std::wstring& from)
         it != from.rend();
         ++it)
     {
-        if (*it != L'.')
+        if (*it != '.')
         {
-            if (*it == L'/' and
+            if (*it == '/' and
                 !found)
             {
                 break; // no extension found
@@ -136,10 +140,10 @@ std::wstring get_file_extension_from_url(const std::wstring& from)
 
     if (!found)
     {
-        return L"";
+        return "";
     }
 
-    std::wstring ext = buff.str();
+    std::string ext = buff.str();
     std::reverse(ext.begin(), ext.end());
 
     return ext;
