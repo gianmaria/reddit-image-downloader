@@ -64,7 +64,7 @@ optional<Response> perform_request(const string& url)
         using namespace curlpp::options;
 
         request.setOpt<Url>(url);
-        //request.setOpt<UserAgent>("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36");
+        request.setOpt<UserAgent>("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36");
         request.setOpt<FollowLocation>(true);
         request.setOpt<MaxRedirs>(10);
         request.setOpt<Verbose>(false);
@@ -96,13 +96,12 @@ optional<string> download_json_from_reddit(
     unsigned limit = 100)
 {
     std::stringstream reddit_url;
-    reddit_url
-        << "https://www.reddit.com"
-        << "/r/" << subreddit
-        << "/top.json"
-        << "?t=" << when
-        << "&raw_json=1"
-        << "&limit=" << limit;
+    reddit_url << "https://www.reddit.com";
+    reddit_url << "/r/" << subreddit;
+    reddit_url << "/top.json";
+    reddit_url << "?t=" << when;
+    reddit_url << "&raw_json=1";
+    reddit_url << "&limit=" << limit;
 
     if (after != "")
     {
@@ -306,13 +305,12 @@ int rid(const string& subreddit,
                 }
 
                 using namespace std::chrono_literals;
-                std::this_thread::sleep_for(1000ms);
+                std::this_thread::sleep_for(100ms);
             }
 
             if (json["data"]["after"].is_null())
             {
                 // nothing left do do, we download everything
-                fs::remove(dest_folder + "/after.txt");
                 cout << "All done!" << endl;
                 break;
             }
