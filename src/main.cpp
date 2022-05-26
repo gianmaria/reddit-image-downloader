@@ -21,6 +21,7 @@ using vector_cref = const std::vector<nlohmann::json>&;
 
 
 const size_t g_FILENAME_MAX_LEN = 180;
+auto constexpr g_PRINT_MAX_LEN = 20;
 
 struct Response
 {
@@ -254,60 +255,54 @@ int rid(const string& subreddit,
                  i < children.size();
                  ++i)
             {
-                ++counter;
                 const auto& child = children[i];
-
-                const auto& data = child["data"];
-
-                const string& raw_title = data["title"].get_ref<str_cref>();
-                const string& url = data["url"].get_ref<str_cref>();
-                //const auto& id = data["id"].get_ref<str_cref>();
-                //const auto& domain = data["domain"].get_ref<str_cref>();
-
-                auto ext_from_url = Utils::get_file_extension_from_url(url);
-
-                bool can_download = is_extension_allowed(ext_from_url);
-                //(data["is_video"] == false) and
-                //(data["domain"] == "i.redd.it");
-
-                //cout << "[INFO] Downloading '" << raw_title << "' ";
-                cout << std::format("[{:04}] ", counter);
+                const string& raw_title = child["data"]["title"].get_ref<str_cref>();
+                const string& url = child["data"]["url"].get_ref<str_cref>();
 
                 auto filename = Utils::remove_invalid_charaters(raw_title);
                 if (filename.length() > g_FILENAME_MAX_LEN)
                     filename.resize(g_FILENAME_MAX_LEN);
 
-                if (can_download)
+                cout << std::format("[{:04}] ", counter++);
+
+                auto ext_from_url = Utils::get_file_extension_from_url(url);
+                bool can_download = is_extension_allowed(ext_from_url);
+
+                if (!can_download)
                 {
-                    auto download_path = dest_folder + "/" + filename + "." + ext_from_url;
+                    cout << std::format("Cannot download '{:.{}}' url '{:.{}}' ( ❌ )",
+                                        filename, g_PRINT_MAX_LEN,
+                                        url, g_PRINT_MAX_LEN) << endl;
+                    continue;
+                }
 
-                    cout << std::format("Downloading '{}' ({}) to <{}> ",
-                                        filename, url, download_path);
 
-                    if (fs::exists(download_path))
-                    {
-                        cout << "file already downloaded! skipping..." << endl;
-                        continue;
-                    }
+                auto download_path = dest_folder + "/" + filename + "." + ext_from_url;
 
-                    // start thread here:
-                    auto success = download_file_to_disk(url, download_path);
+                cout << std::format("Downloading '{:.{}}' ({:.{}}) to <{:.{}}> ",
+                                    filename, g_PRINT_MAX_LEN,
+                                    url, g_PRINT_MAX_LEN,
+                                    download_path, g_PRINT_MAX_LEN);
 
-                    if (success)
-                    {
-                        cout << "( ✅ )" << endl;
-                        //cout << "( ✓ )" << endl;
-                    }
-                    else
-                    {
-                        cout << "( 🛑 )" << endl;
-                    }
+                if (fs::exists(download_path))
+                {
+                    cout << "file already downloaded! skipping..." << endl;
+                    continue;
+                }
+
+                // start thread here:
+                auto success = download_file_to_disk(url, download_path);
+
+                if (success)
+                {
+                    cout << "( ✅ )" << endl;
+                    //cout << "( ✓ )" << endl;
                 }
                 else
                 {
-                    cout << std::format("Cannot download '{}' url '{}' ( ❌ )",
-                                        filename, url) << endl;
+                    cout << "( 🛑 )" << endl;
                 }
+
 
                 using namespace std::chrono_literals;
                 std::this_thread::sleep_for(100ms);
