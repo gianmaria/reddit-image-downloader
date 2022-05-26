@@ -225,8 +225,7 @@ int rid(const string& subreddit,
             }
 #endif 
 
-            njson json;
-            json = njson::parse(resp);
+            njson json = njson::parse(resp);
 
             if (not (json.contains("data") and
                 json["data"].contains("children")))
@@ -260,7 +259,6 @@ int rid(const string& subreddit,
                                         url, g_PRINT_MAX_LEN) << endl;
                     continue;
                 }
-
 
                 auto download_path = dest_folder + "/" + filename + "." + ext_from_url;
 
@@ -303,6 +301,7 @@ int rid(const string& subreddit,
             save_after_to_file(dest_folder, after);
         }
 
+        return 0;
     }
     catch (njson::parse_error& e)
     {
