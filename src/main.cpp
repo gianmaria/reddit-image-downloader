@@ -12,6 +12,7 @@ namespace fs = std::filesystem;
 
 using json = nlohmann::json;
 using str_cref = const std::string&;
+using vector_cref = const std::vector<nlohmann::json>&;
 
 // TODO: 
 // [] multithreading
@@ -247,16 +248,19 @@ int rid(const string& subreddit,
                 return 1;
             }
 
-            const auto& children = json["data"]["children"];
+            const auto& children = json["data"]["children"].get_ref<vector_cref>();
 
-            for (const auto& child : children)
+            for (size_t i = 0;
+                 i < children.size();
+                 ++i)
             {
                 ++counter;
+                const auto& child = children[i];
 
                 const auto& data = child["data"];
 
-                string raw_title = data["title"].get_ref<str_cref>();
-                string url = data["url"].get_ref<str_cref>();
+                const string& raw_title = data["title"].get_ref<str_cref>();
+                const string& url = data["url"].get_ref<str_cref>();
                 //const auto& id = data["id"].get_ref<str_cref>();
                 //const auto& domain = data["domain"].get_ref<str_cref>();
 
@@ -275,18 +279,19 @@ int rid(const string& subreddit,
 
                 if (can_download)
                 {
-                    auto path = dest_folder + "/" + filename + "." + ext_from_url;
+                    auto download_path = dest_folder + "/" + filename + "." + ext_from_url;
 
                     cout << std::format("Downloading '{}' ({}) to <{}> ",
-                                        filename, url, path);
+                                        filename, url, download_path);
 
-                    if (fs::exists(path))
+                    if (fs::exists(download_path))
                     {
                         cout << "file already downloaded! skipping..." << endl;
                         continue;
                     }
 
-                    auto success = download_file_to_disk(url, path);
+                    // start thread here:
+                    auto success = download_file_to_disk(url, download_path);
 
                     if (success)
                     {
