@@ -10,7 +10,7 @@ using std::optional;
 
 namespace fs = std::filesystem;
 
-using json = nlohmann::json;
+using njson = nlohmann::json;
 using str_cref = const std::string&;
 using vector_cref = const std::vector<nlohmann::json>&;
 
@@ -20,8 +20,8 @@ using vector_cref = const std::vector<nlohmann::json>&;
 // [] download images inside a gallery!
 
 
-const size_t g_FILENAME_MAX_LEN = 180;
-auto constexpr g_PRINT_MAX_LEN = 20;
+auto constexpr g_FILENAME_MAX_LEN = 180;
+auto constexpr g_PRINT_MAX_LEN = 30;
 
 struct Response
 {
@@ -207,13 +207,9 @@ int rid(const string& subreddit,
 
         while (true)
         {
-            auto opt_resp = download_json_from_reddit(subreddit, when,
-                                                      after);
-
-            if (!opt_resp)
-                return 1;
-
-            auto& resp = opt_resp.value();
+            auto resp = download_json_from_reddit(subreddit, 
+                                                  when,
+                                                  after).value();
 
 #ifdef _DEBUG 
             // save json to disk for debugging purposes 
@@ -229,24 +225,13 @@ int rid(const string& subreddit,
             }
 #endif 
 
-            json json;
-
-            try
-            {
-                json = json::parse(resp);
-            }
-            catch (json::parse_error& e)
-            {
-                cout << std::format("[ERROR] Cannot parse downloaded json from reddit.com: {}",
-                                    e.what());
-                return 1;
-            }
+            njson json;
+            json = njson::parse(resp);
 
             if (not (json.contains("data") and
                 json["data"].contains("children")))
             {
-                cout << "[ERROR] Unexpected json content... 😳" << endl;
-                return 1;
+                throw std::runtime_error("Unexpected json content... 😳");
             }
 
             const auto& children = json["data"]["children"].get_ref<vector_cref>();
@@ -270,7 +255,7 @@ int rid(const string& subreddit,
 
                 if (!can_download)
                 {
-                    cout << std::format("Cannot download '{:.{}}' url '{:.{}}' ( ❌ )",
+                    cout << std::format("Cannot download '{:.{}}' url is: '{:.{}}' ( ❌ )",
                                         filename, g_PRINT_MAX_LEN,
                                         url, g_PRINT_MAX_LEN) << endl;
                     continue;
@@ -279,10 +264,9 @@ int rid(const string& subreddit,
 
                 auto download_path = dest_folder + "/" + filename + "." + ext_from_url;
 
-                cout << std::format("Downloading '{:.{}}' ({:.{}}) to <{:.{}}> ",
+                cout << std::format("Downloading '{:.{}}' to <{:.{}}> ",
                                     filename, g_PRINT_MAX_LEN,
-                                    url, g_PRINT_MAX_LEN,
-                                    download_path, g_PRINT_MAX_LEN);
+                                    dest_folder, g_PRINT_MAX_LEN);
 
                 if (fs::exists(download_path))
                 {
@@ -320,15 +304,31 @@ int rid(const string& subreddit,
         }
 
     }
+    catch (njson::parse_error& e)
+    {
+        cout << std::format("[ERROR] Cannot parse downloaded json from reddit.com: {}",
+                            e.what()) << endl;
+    }
+    catch (njson::type_error& e)
+    {
+        cout << std::format("[ERROR] Error while parsing json from reddit.com: {}",
+                            e.what()) << endl;
+    }
+    catch (std::bad_optional_access& e)
+    {
+        cout << std::format("[ERROR] {}", e.what()) << endl;
+    }
+    catch (std::runtime_error& e)
+    {
+        cout << std::format("[ERROR] {}", e.what()) << endl;
+    }
     catch (const std::exception& e)
     {
-        cout << "\n\n---" << endl;
-        cout << "[EXCEPTION]: " << e.what() << endl;
-        cout << "---\n\n" << endl;
+        cout << std::format("[EXCEPTION]: {}", e.what()) << endl;
         int stop_here = 0;
     }
 
-    return 0;
+    return 1;
 }
 
 
