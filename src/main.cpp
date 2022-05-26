@@ -177,6 +177,62 @@ bool is_extension_allowed(const string& ext)
     return res;
 }
 
+void download_media(const njson& child,
+                    const string& dest_folder)
+{
+    try
+    {
+        const string& raw_title = child["data"]["title"].get_ref<str_cref>();
+        const string& url = child["data"]["url"].get_ref<str_cref>();
+
+        auto filename = Utils::remove_invalid_charaters(raw_title);
+        if (filename.length() > g_FILENAME_MAX_LEN)
+            filename.resize(g_FILENAME_MAX_LEN);
+
+        //cout << std::format("[{:04}] ", counter++);
+
+        auto ext_from_url = Utils::get_file_extension_from_url(url);
+        bool can_download = is_extension_allowed(ext_from_url);
+
+        if (!can_download)
+        {
+            /*cout << std::format("Cannot download '{:.{}}' url is: '{:.{}}' ( ❌ )",
+                                filename, g_PRINT_MAX_LEN,
+                                url, g_PRINT_MAX_LEN) << endl;*/
+            return;
+        }
+
+        auto download_path = dest_folder + "/" + filename + "." + ext_from_url;
+
+        /*cout << std::format("Downloading '{:.{}}' to <{:.{}}> ",
+                            filename, g_PRINT_MAX_LEN,
+                            dest_folder, g_PRINT_MAX_LEN);*/
+
+        if (fs::exists(download_path))
+        {
+            //cout << "file already downloaded! skipping..." << endl;
+            return;
+        }
+
+        // start thread here:
+        bool success = download_file_to_disk(url, download_path);
+
+        if (success)
+        {
+            //cout << "( ✅ )" << endl;
+        }
+        else
+        {
+            //cout << "( 🛑 )" << endl;
+        }
+
+    }
+    catch (const std::exception& e)
+    {
+        cout << std::format("[{}] {}", "download_media", e.what()) << endl;
+    }
+}
+
 // reddit image downloader
 int rid(const string& subreddit,
         const string& when,
@@ -203,11 +259,11 @@ int rid(const string& subreddit,
             }
         }
 
-        unsigned counter = 0;
+        //unsigned counter = 0;
 
         while (true)
         {
-            auto resp = download_json_from_reddit(subreddit, 
+            auto resp = download_json_from_reddit(subreddit,
                                                   when,
                                                   after).value();
 
@@ -235,59 +291,35 @@ int rid(const string& subreddit,
 
             const auto& children = json["data"]["children"].get_ref<vector_cref>();
 
-            for (size_t i = 0;
-                 i < children.size();
-                 ++i)
+            auto count = children.size();
+            cout << "Downlaoading " << count << " files" << endl;
+
+            while (count > 0)
             {
-                const auto& child = children[i];
-                const string& raw_title = child["data"]["title"].get_ref<str_cref>();
-                const string& url = child["data"]["url"].get_ref<str_cref>();
+                auto constexpr num_threads{ 10 };
 
-                auto filename = Utils::remove_invalid_charaters(raw_title);
-                if (filename.length() > g_FILENAME_MAX_LEN)
-                    filename.resize(g_FILENAME_MAX_LEN);
+                std::array<std::thread, num_threads> threads;
 
-                cout << std::format("[{:04}] ", counter++);
-
-                auto ext_from_url = Utils::get_file_extension_from_url(url);
-                bool can_download = is_extension_allowed(ext_from_url);
-
-                if (!can_download)
+                for (size_t i = 0;
+                     i < num_threads and
+                     count > 0;
+                     ++i)
                 {
-                    cout << std::format("Cannot download '{:.{}}' url is: '{:.{}}' ( ❌ )",
-                                        filename, g_PRINT_MAX_LEN,
-                                        url, g_PRINT_MAX_LEN) << endl;
-                    continue;
+                    threads[i] = std::thread(download_media,
+                                             std::ref(children[count - 1]),
+                                             std::ref(dest_folder));
+
+                    //cout << "Thread " << threads[i].get_id() << " started" << endl;
+
+                    --count;
                 }
 
-                auto download_path = dest_folder + "/" + filename + "." + ext_from_url;
-
-                cout << std::format("Downloading '{:.{}}' to <{:.{}}> ",
-                                    filename, g_PRINT_MAX_LEN,
-                                    dest_folder, g_PRINT_MAX_LEN);
-
-                if (fs::exists(download_path))
+                for (auto& thread : threads)
                 {
-                    cout << "file already downloaded! skipping..." << endl;
-                    continue;
+                    //cout << "Thread " << thread.get_id() <<  " finished" << endl;
+                    if (thread.joinable())
+                        thread.join();
                 }
-
-                // start thread here:
-                auto success = download_file_to_disk(url, download_path);
-
-                if (success)
-                {
-                    cout << "( ✅ )" << endl;
-                    //cout << "( ✓ )" << endl;
-                }
-                else
-                {
-                    cout << "( 🛑 )" << endl;
-                }
-
-
-                using namespace std::chrono_literals;
-                std::this_thread::sleep_for(100ms);
             }
 
             if (json["data"]["after"].is_null())
@@ -305,26 +337,25 @@ int rid(const string& subreddit,
     }
     catch (njson::parse_error& e)
     {
-        cout << std::format("[ERROR] Cannot parse downloaded json from reddit.com: {}",
+        cout << std::format("[parse_error] Cannot parse downloaded json from reddit.com: {}",
                             e.what()) << endl;
     }
     catch (njson::type_error& e)
     {
-        cout << std::format("[ERROR] Error while parsing json from reddit.com: {}",
+        cout << std::format("[type_error] Error while parsing json from reddit.com: {}",
                             e.what()) << endl;
     }
     catch (std::bad_optional_access& e)
     {
-        cout << std::format("[ERROR] {}", e.what()) << endl;
+        cout << std::format("[bad_optional_access] {}", e.what()) << endl;
     }
     catch (std::runtime_error& e)
     {
-        cout << std::format("[ERROR] {}", e.what()) << endl;
+        cout << std::format("[runtime_error] {}", e.what()) << endl;
     }
     catch (const std::exception& e)
     {
-        cout << std::format("[EXCEPTION]: {}", e.what()) << endl;
-        int stop_here = 0;
+        cout << std::format("[exception]: {}", e.what()) << endl;
     }
 
     return 1;
@@ -404,6 +435,4 @@ void run_test()
     //auto len = clean_title.length();
 
     //auto url = "https://external-preview.redd.it/kGZO86rtKFwRNHxTuQaPOE3XBAVwvPhXjVzZEyLntB8.jpg?auto=webp\\u0026s=8c6c31b828bbc706749dabe3ab6b3a0439480421";
-
-    int stop = 0;
 }
