@@ -21,12 +21,48 @@ using vector_cref = const std::vector<nlohmann::json>&;
 
 
 auto constexpr g_FILENAME_MAX_LEN = 180;
-auto constexpr g_PRINT_MAX_LEN = 30;
+auto constexpr g_PRINT_MAX_LEN = 50;
 
 struct Response
 {
     string content;
     long code;
+};
+
+enum class Download_Res: uint8_t
+{
+    INVALID,
+    DOWNLOADED,
+    FAILED,
+    SKIPPED, // file already existed
+    UNABLE // don't know how to download url
+};
+
+std::ostream& operator<<(std::ostream& os, const Download_Res& dr)
+{
+    switch (dr)
+    {
+        case Download_Res::INVALID: os << "INVALID"; break;
+        case Download_Res::DOWNLOADED: os << "DOWNLOADED ( ✅ )"; break;
+        case Download_Res::FAILED: os << "FAILED ( 🛑 )"; break;
+        case Download_Res::SKIPPED: os << "SKIPPED ( ↪ )"; break;        
+        case Download_Res::UNABLE:  os << "UNABLE  ( ❌ )"; break;
+    }
+    return os;
+}
+
+string to_str(const Download_Res& dr)
+{
+    std::stringstream ss;
+    ss << dr;
+    return ss.str();
+}
+
+struct Thread_Res
+{
+    string title;
+    string url;
+    Download_Res download_res = Download_Res::INVALID;
 };
 
 void run_test();
@@ -177,9 +213,11 @@ bool is_extension_allowed(const string& ext)
     return res;
 }
 
-void download_media(const njson& child,
+Thread_Res download_media(const njson& child,
                     const string& dest_folder)
 {
+    Thread_Res res;
+
     try
     {
         const string& raw_title = child["data"]["title"].get_ref<str_cref>();
@@ -189,6 +227,8 @@ void download_media(const njson& child,
         if (filename.length() > g_FILENAME_MAX_LEN)
             filename.resize(g_FILENAME_MAX_LEN);
 
+        res.title = filename;
+        res.url = url;
         //cout << std::format("[{:04}] ", counter++);
 
         auto ext_from_url = Utils::get_file_extension_from_url(url);
@@ -199,7 +239,8 @@ void download_media(const njson& child,
             /*cout << std::format("Cannot download '{:.{}}' url is: '{:.{}}' ( ❌ )",
                                 filename, g_PRINT_MAX_LEN,
                                 url, g_PRINT_MAX_LEN) << endl;*/
-            return;
+            res.download_res = Download_Res::UNABLE;
+            return res;
         }
 
         auto download_path = dest_folder + "/" + filename + "." + ext_from_url;
@@ -211,7 +252,8 @@ void download_media(const njson& child,
         if (fs::exists(download_path))
         {
             //cout << "file already downloaded! skipping..." << endl;
-            return;
+            res.download_res = Download_Res::SKIPPED;
+            return res;
         }
 
         // start thread here:
@@ -220,17 +262,21 @@ void download_media(const njson& child,
         if (success)
         {
             //cout << "( ✅ )" << endl;
+            res.download_res = Download_Res::DOWNLOADED;
         }
         else
         {
             //cout << "( 🛑 )" << endl;
+            res.download_res = Download_Res::FAILED;
         }
-
     }
     catch (const std::exception& e)
     {
-        cout << std::format("[{}] {}", "download_media", e.what()) << endl;
+        cout << std::format("[{}] {}", "download_media()", e.what()) << endl;
+        return {};
     }
+
+    return res;
 }
 
 // reddit image downloader
@@ -259,7 +305,7 @@ int rid(const string& subreddit,
             }
         }
 
-        //unsigned counter = 0;
+        unsigned file_processed = 0;
 
         while (true)
         {
@@ -298,27 +344,44 @@ int rid(const string& subreddit,
             {
                 auto constexpr num_threads{ 10 };
 
-                std::array<std::thread, num_threads> threads;
+                std::array<std::future<Thread_Res>, num_threads> threads;
 
                 for (size_t i = 0;
                      i < num_threads and
                      count > 0;
                      ++i)
                 {
-                    threads[i] = std::thread(download_media,
-                                             std::ref(children[count - 1]),
-                                             std::ref(dest_folder));
-
-                    //cout << "Thread " << threads[i].get_id() << " started" << endl;
-
+                    auto future = std::async(std::launch::async, 
+                                         download_media,
+                                         std::ref(children[count - 1]),
+                                         std::ref(dest_folder));
+                    
+                    threads[i] = std::move(future);
+                    ++file_processed;
                     --count;
                 }
 
                 for (auto& thread : threads)
                 {
-                    //cout << "Thread " << thread.get_id() <<  " finished" << endl;
-                    if (thread.joinable())
-                        thread.join();
+                    if (thread.valid())
+                    {
+                        auto res = thread.get(); // blocking, calls wait()
+                        /*cout << std::format("Cannot download '{:.{}}' url is: '{:.{}}' ( ❌ )",
+                                filename, g_PRINT_MAX_LEN,
+                                url, g_PRINT_MAX_LEN) << endl;*/
+                        cout << std::format("[{}] {:<{}.{}} -> {}", 
+                                            file_processed,
+                                            res.title, g_PRINT_MAX_LEN, g_PRINT_MAX_LEN,
+                                            to_str(res.download_res)) 
+                            << endl;
+                        /*cout << std::format("[{}] '{:.{}}' -> {}", 
+                                            file_processed,
+                                            res.title, g_PRINT_MAX_LEN,
+                                            to_str(res.download_res)) 
+                            << endl;
+                        */
+                        //cout << res.title << " -> " << res.download_res << endl;
+                    }
                 }
             }
 
