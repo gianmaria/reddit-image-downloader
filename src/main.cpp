@@ -15,7 +15,8 @@ using str_cref = const std::string&;
 using vector_cref = const std::vector<nlohmann::json>&;
 
 // TODO: 
-// [] multithreading
+// [X] multithreading
+// [] download images from website other than reddit
 // [] download media in the form of: https://v.redd.it/
 // [] download images inside a gallery!
 
@@ -34,7 +35,7 @@ enum class Download_Res : uint8_t
     INVALID,
     DOWNLOADED,
     FAILED,
-    SKIPPED, // file already existed
+    SKIPPED, // file already downloaded
     UNABLE // don't know how to download url
 };
 
@@ -45,7 +46,7 @@ std::ostream& operator<<(std::ostream& os, const Download_Res& dr)
         case Download_Res::INVALID: os << "INVALID"; break;
         case Download_Res::DOWNLOADED: os << "DOWNLOADED ( ✅ )"; break;
         case Download_Res::FAILED: os << "FAILED ( 🛑 )"; break;
-        case Download_Res::SKIPPED: os << "SKIPPED ( ↪ )"; break;
+        case Download_Res::SKIPPED: os << "SKIPPED ( 🔵 )"; break;
         case Download_Res::UNABLE:  os << "UNABLE  ( ❌ )"; break;
     }
     return os;
