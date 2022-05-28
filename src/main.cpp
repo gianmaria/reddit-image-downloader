@@ -365,10 +365,22 @@ int rid(const string& subreddit,
                     if (thread.valid())
                     {
                         auto res = thread.get(); // blocking, calls wait()
+                        if (res.download_res == Download_Res::DOWNLOADED or
+                            res.download_res == Download_Res::SKIPPED)
+                        {
                         cout << std::format("[{}] {:<{}.{}} -> {}",
                                             res.file_id,
                                             res.title, g_PRINT_MAX_LEN, g_PRINT_MAX_LEN,
                                             to_str(res.download_res)) << endl;
+                    }
+                        else
+                        {
+                            cout << std::format("[{}] {:<{}.{}} -> {} url: '{}'",
+                                                res.file_id,
+                                                res.title, g_PRINT_MAX_LEN, g_PRINT_MAX_LEN,
+                                                to_str(res.download_res),
+                                                res.url) << endl;
+                        }
                     }
                 }
             }
@@ -469,6 +481,9 @@ void run_test()
     assert(Utils::get_file_extension_from_url("https://i.imgur.com/gBj52nI") == "");
     assert(Utils::get_file_extension_from_url("https://gfycat.com/MeekWeightyFrogmouth") == "");
     assert(Utils::get_file_extension_from_url("https://66.media.tumblr.com/8ead6e96ca8e3e8fe16434181e8a1493/tumblr_oruoo12vtR1s5qhggo3_1280.png") == "png");
+
+    assert(is_extension_allowed(Utils::get_file_extension_from_url("https://i.redd.it/nqa4sfb8ns191.png")));
+
 
     // gif, jpeg, png, jpg, bmp
     assert(is_extension_allowed("png"));
