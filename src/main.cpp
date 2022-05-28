@@ -426,8 +426,6 @@ int rid(const string& subreddit,
 
 
 
-// rid.exe VaporwaveAesthetics "top" [hour | day | week | month | year | all] where
-//int wmain(int argc, wchar_t* argv[])
 int main(int argc, char* argv[])
 {
     SetConsoleCP(CP_UTF8);
