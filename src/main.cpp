@@ -446,7 +446,7 @@ int main(int argc, char* argv[])
 #else
 
     argparse::ArgumentParser program("rid", "1.0.0");
-    program.add_description("Reddir Image Downloader\nAllows you to download all the top images from a specified subreddit");
+    program.add_description("Reddit Image Downloader\nAllows you to download all the top images from a specified subreddit");
     program.add_argument("subreddit")
         .help("subreddit name from wich all the images will be download (without the /r) for example: VaporwaveAesthetics");
     program.add_argument("when")
