@@ -60,6 +60,7 @@ string to_str(const Download_Res& dr)
 
 struct Thread_Res
 {
+    unsigned file_id;
     string title;
     string url;
     Download_Res download_res = Download_Res::INVALID;
@@ -213,10 +214,12 @@ bool is_extension_allowed(const string& ext)
     return res;
 }
 
-Thread_Res download_media(const njson& child,
+Thread_Res download_media(unsigned file_id,
+                          const njson& child,
                           const string& dest_folder)
 {
     Thread_Res res;
+    res.file_id = file_id;
 
     try
     {
@@ -332,7 +335,7 @@ int rid(const string& subreddit,
             const auto& children = json["data"]["children"].get_ref<vector_cref>();
 
             auto file_to_download = children.size();
-            cout << "[INFO] Downlaoading " << file_to_download << " files" << endl;
+            //cout << "[INFO] Downlaoading " << file_to_download << " files" << endl;
 
             while (file_to_download > 0)
             {
@@ -345,13 +348,14 @@ int rid(const string& subreddit,
                      file_to_download > 0;
                      ++i)
                 {
+                    ++file_processed;
                     auto future = std::async(std::launch::async,
                                              download_media,
+                                             file_processed,
                                              std::ref(children[file_to_download - 1]),
                                              std::ref(dest_folder));
 
                     threads[i] = std::move(future);
-                    ++file_processed;
                     --file_to_download;
                 }
 
@@ -361,7 +365,7 @@ int rid(const string& subreddit,
                     {
                         auto res = thread.get(); // blocking, calls wait()
                         cout << std::format("[{}] {:<{}.{}} -> {}",
-                                            file_processed,
+                                            res.file_id,
                                             res.title, g_PRINT_MAX_LEN, g_PRINT_MAX_LEN,
                                             to_str(res.download_res)) << endl;
                     }
