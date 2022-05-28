@@ -296,7 +296,7 @@ int rid(const string& subreddit,
 
         if (not fs::exists(dest_folder))
         {
-            if (not fs::create_directory(dest_folder))
+            if (not fs::create_directories(dest_folder))
             {
                 cout << std::format("[ERROR] Cannot create folder <{}>", dest_folder) << endl;
                 return 1;
