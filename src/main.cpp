@@ -29,7 +29,7 @@ struct Response
     long code;
 };
 
-enum class Download_Res: uint8_t
+enum class Download_Res : uint8_t
 {
     INVALID,
     DOWNLOADED,
@@ -45,7 +45,7 @@ std::ostream& operator<<(std::ostream& os, const Download_Res& dr)
         case Download_Res::INVALID: os << "INVALID"; break;
         case Download_Res::DOWNLOADED: os << "DOWNLOADED ( ✅ )"; break;
         case Download_Res::FAILED: os << "FAILED ( 🛑 )"; break;
-        case Download_Res::SKIPPED: os << "SKIPPED ( ↪ )"; break;        
+        case Download_Res::SKIPPED: os << "SKIPPED ( ↪ )"; break;
         case Download_Res::UNABLE:  os << "UNABLE  ( ❌ )"; break;
     }
     return os;
@@ -214,7 +214,7 @@ bool is_extension_allowed(const string& ext)
 }
 
 Thread_Res download_media(const njson& child,
-                    const string& dest_folder)
+                          const string& dest_folder)
 {
     Thread_Res res;
 
@@ -286,12 +286,6 @@ int rid(const string& subreddit,
 {
     try
     {
-        // 
-        // get json file from r/$subreddit
-        // save 'after' value to file
-        // print all the title
-        // get json file from r/VaporwaveAesthetics with after value
-
         curlpp::Cleanup cleanup;
 
         string after = get_after_from_file(dest_folder);
@@ -337,10 +331,10 @@ int rid(const string& subreddit,
 
             const auto& children = json["data"]["children"].get_ref<vector_cref>();
 
-            auto count = children.size();
-            cout << "Downlaoading " << count << " files" << endl;
+            auto file_to_download = children.size();
+            cout << "[INFO] Downlaoading " << file_to_download << " files" << endl;
 
-            while (count > 0)
+            while (file_to_download > 0)
             {
                 auto constexpr num_threads{ 10 };
 
@@ -348,17 +342,17 @@ int rid(const string& subreddit,
 
                 for (size_t i = 0;
                      i < num_threads and
-                     count > 0;
+                     file_to_download > 0;
                      ++i)
                 {
-                    auto future = std::async(std::launch::async, 
-                                         download_media,
-                                         std::ref(children[count - 1]),
-                                         std::ref(dest_folder));
-                    
+                    auto future = std::async(std::launch::async,
+                                             download_media,
+                                             std::ref(children[file_to_download - 1]),
+                                             std::ref(dest_folder));
+
                     threads[i] = std::move(future);
                     ++file_processed;
-                    --count;
+                    --file_to_download;
                 }
 
                 for (auto& thread : threads)
@@ -366,21 +360,10 @@ int rid(const string& subreddit,
                     if (thread.valid())
                     {
                         auto res = thread.get(); // blocking, calls wait()
-                        /*cout << std::format("Cannot download '{:.{}}' url is: '{:.{}}' ( ❌ )",
-                                filename, g_PRINT_MAX_LEN,
-                                url, g_PRINT_MAX_LEN) << endl;*/
-                        cout << std::format("[{}] {:<{}.{}} -> {}", 
+                        cout << std::format("[{}] {:<{}.{}} -> {}",
                                             file_processed,
                                             res.title, g_PRINT_MAX_LEN, g_PRINT_MAX_LEN,
-                                            to_str(res.download_res)) 
-                            << endl;
-                        /*cout << std::format("[{}] '{:.{}}' -> {}", 
-                                            file_processed,
-                                            res.title, g_PRINT_MAX_LEN,
-                                            to_str(res.download_res)) 
-                            << endl;
-                        */
-                        //cout << res.title << " -> " << res.download_res << endl;
+                                            to_str(res.download_res)) << endl;
                     }
                 }
             }
