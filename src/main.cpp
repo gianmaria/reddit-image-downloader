@@ -302,7 +302,7 @@ int rid(const string& subreddit,
             }
         }
 
-        unsigned file_processed = 0;
+        unsigned files_processed = 0;
 
         while (true)
         {
@@ -334,10 +334,10 @@ int rid(const string& subreddit,
 
             const auto& children = json["data"]["children"].get_ref<vector_cref>();
 
-            auto file_to_download = children.size();
+            auto files_to_download = children.size();
             //cout << "[INFO] Downlaoading " << file_to_download << " files" << endl;
 
-            while (file_to_download > 0)
+            while (files_to_download > 0)
             {
                 auto constexpr num_threads{ 10 };
 
@@ -345,18 +345,18 @@ int rid(const string& subreddit,
 
                 for (size_t i = 0;
                      i < num_threads and
-                     file_to_download > 0;
+                     files_to_download > 0;
                      ++i)
                 {
-                    ++file_processed;
+                    ++files_processed;
                     auto future = std::async(std::launch::async,
                                              download_media,
-                                             file_processed,
-                                             std::ref(children[file_to_download - 1]),
+                                             files_processed,
+                                             std::ref(children[files_to_download - 1]),
                                              std::ref(dest_folder));
 
                     threads[i] = std::move(future);
-                    --file_to_download;
+                    --files_to_download;
                 }
 
                 for (auto& thread : threads)
@@ -376,6 +376,7 @@ int rid(const string& subreddit,
             {
                 // nothing left do do, we download everything
                 cout << "All done!" << endl;
+                fs::remove(dest_folder + "/after.txt");
                 break;
             }
 
