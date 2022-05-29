@@ -169,9 +169,9 @@ optional<string> download_json_from_reddit(
 }
 
 bool download_file_to_disk(const string& url,
-                           const string& path)
+                           const string& destination)
 {
-    std::ofstream ofs(path,
+    std::ofstream ofs(destination,
                       std::ofstream::binary |
                       std::ofstream::trunc);
 
@@ -181,8 +181,6 @@ bool download_file_to_disk(const string& url,
 
         if (not opt_res.has_value())
         {
-            cout << std::format("[ERROR] Failed to download url '{}' to <{}>",
-                                url, path) << endl;
             return false;
         }
 
@@ -192,7 +190,7 @@ bool download_file_to_disk(const string& url,
     }
     else
     {
-        cout << std::format("[WARN] Cannot open file for writing <{}>", path) << endl;
+        cout << std::format("[WARN] Cannot open file for writing <{}>", destination) << endl;
         return false;
     }
 
