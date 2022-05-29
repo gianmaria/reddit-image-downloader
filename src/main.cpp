@@ -18,8 +18,9 @@ using string_cref = const string&;
 // TODO: 
 // [X] multithreading
 // [] download images from website other than reddit
-//    [] imgur.com
-// [] download media in the form of: https://v.redd.it/
+//    [X] imgur.com
+//    [] v.redd.it
+//    [] gfycat.com
 // [] download images inside a gallery! e.g. https://www.reddit.com/gallery/uw2ikr
 
 
@@ -444,6 +445,16 @@ Thread_Res download_media(long file_id,
                     // TODO: this is problematic.... multiple downloads and only one result....
                     res.download_res = perform_download(actual_url, title, dest_folder);
                 });
+            }
+            else if (domain == "v.redd.it")
+            {
+                // TMP:
+                res.download_res = Download_Res::UNABLE;
+            }
+            else if (domain == "gfycat.com")
+            {
+                // TMP:
+                res.download_res = Download_Res::UNABLE;
             }
             else
             {
