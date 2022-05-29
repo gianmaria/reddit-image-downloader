@@ -8,6 +8,7 @@
 #include <fstream>
 #include <future>
 #include <iostream>
+#include <list>
 #include <mutex>
 #include <optional>
 #include <sstream>
