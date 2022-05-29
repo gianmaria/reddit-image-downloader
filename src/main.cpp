@@ -274,6 +274,48 @@ string extract_image_id_from_url(const string& url)
     return image_id;
 }
 
+string env(string_cref name)
+{
+    auto split_line = [](string_cref line) 
+        -> std::pair<string, string>
+    {
+        const string delimiter = "=";
+        auto pos = line.find(delimiter);
+
+        if (pos == std::string::npos)
+            return {};
+
+        std::pair<string, string> res;
+
+        res.first = line.substr(0, pos);
+        res.second = line.substr(pos+1);
+
+        return res;
+    };
+
+    std::ifstream ifs(".env");
+
+    string res{};
+
+    if (ifs.is_open())
+    {
+        for (string line;
+             std::getline(ifs, line);
+             )
+        {
+            auto [key, value] = split_line(line);
+
+            if (key == name)
+            {
+                res = value;
+                break;
+            }
+        }
+    }
+
+    return res;
+}
+
 std::vector<string> handle_imgur(string_cref subreddit, 
                                  string_cref image_id)
 {
@@ -283,6 +325,7 @@ std::vector<string> handle_imgur(string_cref subreddit,
 
     string url = "https://api.imgur.com/3/gallery/r/" + subreddit + "/" + image_id;
 
+    auto opt_resp = perform_request(url, { "Authorization: Client-ID " + env("IMGUR_CLIENT_ID") });
 
     if (not opt_resp.has_value())
     {
@@ -633,4 +676,10 @@ void run_test()
     //auto len = clean_title.length();
 
     //auto url = "https://external-preview.redd.it/kGZO86rtKFwRNHxTuQaPOE3XBAVwvPhXjVzZEyLntB8.jpg?auto=webp\\u0026s=8c6c31b828bbc706749dabe3ab6b3a0439480421";
+
+    auto GIPY_CLIENT_ID = env("GIPY_CLIENT_ID");
+    auto IMGUR_CLIENT_ID = env("IMGUR_CLIENT_ID");
+    auto REDDIT_CLIENT_ID = env("REDDIT_CLIENT_ID");
+    
+    int stop = 0;
 }
