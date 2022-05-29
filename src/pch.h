@@ -24,6 +24,20 @@
 
 #include <nlohmann/json.hpp>
 
-#include "utils.h"
-
 #include <argparse/argparse.hpp>
+
+
+using std::cout;
+using std::wcout;
+using std::endl;
+using std::string;
+using std::wstring;
+using std::vector;
+using std::optional;
+
+namespace fs = std::filesystem;
+
+using njson = nlohmann::json;
+using str_cref = const std::string&;
+using vector_cref = const std::vector<nlohmann::json>&;
+using string_cref = const string&;

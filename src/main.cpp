@@ -1,19 +1,6 @@
 ﻿#include "pch.h"
 
-using std::cout;
-using std::wcout;
-using std::endl;
-using std::string;
-using std::wstring;
-using std::vector;
-using std::optional;
-
-namespace fs = std::filesystem;
-
-using njson = nlohmann::json;
-using str_cref = const std::string&;
-using vector_cref = const std::vector<nlohmann::json>&;
-using string_cref = const string&;
+#include "utils.h"
 
 // TODO: 
 // [X] multithreading
@@ -201,42 +188,6 @@ bool download_file_to_disk(const string& url,
     return true;
 }
 
-bool is_extension_allowed(const string& ext)
-{
-    const vector<string> allowed_ext
-    {
-        "gif", "jpeg", "png",
-        "jpg", "bmp"
-    };
-
-    bool res = std::any_of(
-        allowed_ext.begin(),
-        allowed_ext.end(),
-        [&ext](const string& allowed_ext)
-    {
-        return allowed_ext == ext;
-    });
-
-    return res;
-}
-
-bool is_domain_known(const string& domain)
-{
-    const vector<string> allowed_domains
-    {
-        "imgur.com"
-    };
-
-    bool res = std::any_of(
-        allowed_domains.begin(),
-        allowed_domains.end(),
-        [&domain](const string& allowed_domain)
-    {
-        return allowed_domain == domain;
-    });
-
-    return res;
-}
 
 string extract_image_id_from_url(const string& url)
 {
@@ -276,47 +227,6 @@ string extract_image_id_from_url(const string& url)
     return image_id;
 }
 
-string env(string_cref name)
-{
-    auto split_line = [](string_cref line) 
-        -> std::pair<string, string>
-    {
-        const string delimiter = "=";
-        auto pos = line.find(delimiter);
-
-        if (pos == std::string::npos)
-            return {};
-
-        std::pair<string, string> res;
-
-        res.first = line.substr(0, pos);
-        res.second = line.substr(pos+1);
-
-        return res;
-    };
-
-    std::ifstream ifs(".env");
-
-    string res{};
-
-    if (ifs.is_open())
-    {
-        for (string line;
-             std::getline(ifs, line);
-             )
-        {
-            auto [key, value] = split_line(line);
-
-            if (key == name)
-            {
-                res = value;
-                break;
-            }
-        }
-    }
-
-    return res;
-}
 
 std::vector<string> handle_imgur(string_cref subreddit, 
                                  string_cref image_id)
@@ -670,13 +580,13 @@ void run_test()
     assert(Utils::get_file_extension_from_url("https://gfycat.com/MeekWeightyFrogmouth") == "");
     assert(Utils::get_file_extension_from_url("https://66.media.tumblr.com/8ead6e96ca8e3e8fe16434181e8a1493/tumblr_oruoo12vtR1s5qhggo3_1280.png") == "png");
 
-    assert(is_extension_allowed(Utils::get_file_extension_from_url("https://i.redd.it/nqa4sfb8ns191.png")));
+    assert(Utils::is_extension_allowed(Utils::get_file_extension_from_url("https://i.redd.it/nqa4sfb8ns191.png")));
 
 
     // gif, jpeg, png, jpg, bmp
-    assert(is_extension_allowed("png"));
-    assert(is_extension_allowed("bmp"));
-    assert(not is_extension_allowed("mp4"));
+    assert(Utils::is_extension_allowed("png"));
+    assert(Utils::is_extension_allowed("bmp"));
+    assert(not Utils::is_extension_allowed("mp4"));
 
     //auto long_title = 
     //    "Weekly vinyl rip is LIVE: This week, A class in​​.​​​.​​​. ​​CRYPTO CURRENCY "
