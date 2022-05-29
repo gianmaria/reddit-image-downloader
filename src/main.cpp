@@ -43,10 +43,10 @@ std::ostream& operator<<(std::ostream& os, const Download_Res& dr)
 {
     switch (dr)
     {
-        case Download_Res::INVALID: os << "INVALID"; break;
-        case Download_Res::DOWNLOADED: os << "DOWNLOADED ( ✅ )"; break;
+        case Download_Res::INVALID: os << "INVALID ENUM VALUE"; break;
+        case Download_Res::SKIPPED:
+        case Download_Res::DOWNLOADED: os << "( ✅ )"; break;
         case Download_Res::FAILED: os << "FAILED ( 🛑 )"; break;
-        case Download_Res::SKIPPED: os << "SKIPPED ( 🔵 )"; break;
         case Download_Res::UNABLE:  os << "UNABLE  ( ❌ )"; break;
     }
     return os;
