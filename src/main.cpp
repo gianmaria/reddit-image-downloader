@@ -25,6 +25,7 @@ using string_cref = const string&;
 
 auto constexpr g_TITLE_MAX_LEN = 100;
 auto constexpr g_PRINT_MAX_LEN = 50;
+auto constexpr g_num_threads{ 1 }; // num threads
 
 struct Response
 {
@@ -372,11 +373,11 @@ std::vector<string> handle_imgur(string_cref subreddit,
     return res;
 }
 
-Thread_Res prepare_media_to_download(long file_id,
+Thread_Res download_media(long file_id,
                                      const njson& child,
                                      const string& dest_folder)
 {
-    auto download_media = [](string_cref url,
+    auto perform_download = [](string_cref url,
                              string_cref title,
                              string_cref dest_folder
                              ) -> Download_Res
@@ -423,7 +424,7 @@ Thread_Res prepare_media_to_download(long file_id,
         
         if (file_extension != "") // has en extension
         {
-            res.download_res = download_media(url, title, dest_folder);
+            res.download_res = perform_download(url, title, dest_folder);
         }
         else
         {
@@ -438,10 +439,10 @@ Thread_Res prepare_media_to_download(long file_id,
 
                 std::for_each(actual_urls.begin(),
                               actual_urls.end(),
-                              [&title, &dest_folder, &res, &download_media](string_cref actual_url)
+                              [&title, &dest_folder, &res, &perform_download](string_cref actual_url)
                 {
                     // TODO: this is problematic.... multiple downloads and only one result....
-                    res.download_res = download_media(actual_url, title, dest_folder);
+                    res.download_res = perform_download(actual_url, title, dest_folder);
                 });
             }
             else
@@ -452,7 +453,9 @@ Thread_Res prepare_media_to_download(long file_id,
     }
     catch (const std::exception& e)
     {
-        cout << std::format("[{}] {}", "download_media()", e.what()) << endl;
+        cout << std::format("[ECXEP][download_media()] {} url: {}", 
+                            e.what(), child["data"]["url"].get_ref<str_cref>())
+            << endl;
         return {};
     }
 
@@ -516,18 +519,16 @@ int rid(const string& subreddit,
 
             while (files_to_download > 0)
             {
-                auto constexpr num_threads{ 10 }; // num threads
-
-                std::array<std::future<Thread_Res>, num_threads> threads;
+                std::array<std::future<Thread_Res>, g_num_threads> threads;
 
                 for (size_t i = 0;
-                     i < num_threads and
+                     i < g_num_threads and
                      files_to_download > 0;
                      ++i)
                 {
                     ++files_processed;
                     auto future = std::async(std::launch::async,
-                                             prepare_media_to_download,
+                                             download_media,
                                              files_processed,
                                              std::ref(children[files_to_download - 1]),
                                              std::ref(dest_folder));
