@@ -11,7 +11,7 @@
 // [] download images inside a gallery! e.g. https://www.reddit.com/gallery/uw2ikr
 
 
-auto constexpr g_TITLE_MAX_LEN = 100;
+auto constexpr g_TITLE_MAX_LEN = 120;
 auto constexpr g_PRINT_MAX_LEN = 50;
 auto constexpr g_num_threads{ 1 }; // num threads
 
@@ -228,7 +228,7 @@ string extract_image_id_from_url(const string& url)
 }
 
 
-std::vector<string> handle_imgur(string_cref subreddit, 
+std::vector<string> handle_imgur(string_cref subreddit,
                                  string_cref image_id)
 {
     // https://apidocs.imgur.com/#10456589-7167-4b5c-acd3-a1e4eb6a95ed
@@ -237,7 +237,9 @@ std::vector<string> handle_imgur(string_cref subreddit,
 
     string url = "https://api.imgur.com/3/gallery/r/" + subreddit + "/" + image_id;
 
-    auto opt_resp = perform_request(url, { "Authorization: Client-ID " + env("IMGUR_CLIENT_ID") });
+    auto opt_resp = perform_request(url,
+                                    { "Authorization: Client-ID " +
+                                    Utils::env("IMGUR_CLIENT_ID") });
 
     if (not opt_resp.has_value())
     {
@@ -260,7 +262,7 @@ std::vector<string> handle_imgur(string_cref subreddit,
 
     if (not json["success"].get<bool>())
     {
-        cout << "[ERROR] returned from imgur.com contains an error, status: " 
+        cout << "[ERROR] returned from imgur.com contains an error, status: "
             << json["status"] << endl;
         return {};
     }
@@ -285,13 +287,13 @@ std::vector<string> handle_imgur(string_cref subreddit,
 }
 
 Thread_Res download_media(long file_id,
-                                     const njson& child,
-                                     const string& dest_folder)
+                          const njson& child,
+                          const string& dest_folder)
 {
     auto perform_download = [](string_cref url,
-                             string_cref title,
-                             string_cref dest_folder
-                             ) -> Download_Res
+                               string_cref title,
+                               string_cref dest_folder
+                               ) -> Download_Res
     {
         auto ext_from_url = Utils::get_file_extension_from_url(url);
 
@@ -322,26 +324,42 @@ Thread_Res download_media(long file_id,
 
         const string& raw_title = child["data"]["title"].get_ref<str_cref>();
 
+        // TMP:
+        /*
+        * example with very long title to cut
+        if (child["data"]["url"].get_ref<str_cref>() == "https://i.redd.it/etoxbqvodjt31.png")
+            int stop = 0;
+        */
+
         auto title = Utils::remove_invalid_charaters(raw_title);
-        if (title.length() > g_TITLE_MAX_LEN)
-            title.resize(g_TITLE_MAX_LEN);
+
+        if (Utils::UTF8_len(title) > g_TITLE_MAX_LEN)
+        {
+            // TODO: use proper resizing...
+            Utils::resize_string(title, g_TITLE_MAX_LEN);
+        }
 
         res.title = title;
 
         const string& url = child["data"]["url"].get_ref<str_cref>();
         res.url = url;
 
-        auto file_extension = Utils::get_file_extension_from_url(url);
-        
-        if (file_extension != "") // has en extension
+
+        if (Utils::get_file_extension_from_url(url) != "")
         {
+            // try direct download
             res.download_res = perform_download(url, title, dest_folder);
         }
         else
         {
             const string& domain = child["data"]["domain"].get_ref<str_cref>();
 
-            if (domain == "imgur.com")
+            if (domain == "v.redd.it")
+            {
+                // TODO:
+                res.download_res = Download_Res::UNABLE;
+            }
+            else if (domain == "imgur.com")
             {
                 const string& subreddit = child["data"]["subreddit"].get_ref<str_cref>();
                 string image_id = extract_image_id_from_url(url);
@@ -356,14 +374,11 @@ Thread_Res download_media(long file_id,
                     res.download_res = perform_download(actual_url, title, dest_folder);
                 });
             }
-            else if (domain == "v.redd.it")
-            {
-                // TMP:
-                res.download_res = Download_Res::UNABLE;
-            }
             else if (domain == "gfycat.com")
             {
-                // TMP:
+                // https://developers.gfycat.com/api/?curl#getting-info-for-a-single-gfycat
+                // ecample: https://api.gfycat.com/v1/gfycats/JampackedUnrulyArcherfish
+                // TODO:
                 res.download_res = Download_Res::UNABLE;
             }
             else
@@ -374,7 +389,7 @@ Thread_Res download_media(long file_id,
     }
     catch (const std::exception& e)
     {
-        cout << std::format("[ECXEP][download_media()] {} url: {}", 
+        cout << std::format("[ECXEP][download_media()] {} url: {}",
                             e.what(), child["data"]["url"].get_ref<str_cref>())
             << endl;
         return {};
@@ -414,7 +429,8 @@ int rid(const string& subreddit,
 #ifdef _DEBUG 
             // save json to disk for debugging purposes 
             {
-                std::ofstream out(dest_folder + "/" + subreddit + "_" + when + "_" + after + ".json",
+                std::ofstream out(dest_folder + "/!#_" + subreddit 
+                                  + "_" + when + "_" + after + ".json",
                                   std::ofstream::trunc |
                                   std::ofstream::binary);
 
@@ -599,9 +615,9 @@ void run_test()
 
     //auto url = "https://external-preview.redd.it/kGZO86rtKFwRNHxTuQaPOE3XBAVwvPhXjVzZEyLntB8.jpg?auto=webp\\u0026s=8c6c31b828bbc706749dabe3ab6b3a0439480421";
 
-    auto GIPY_CLIENT_ID = env("GIPY_CLIENT_ID");
-    auto IMGUR_CLIENT_ID = env("IMGUR_CLIENT_ID");
-    auto REDDIT_CLIENT_ID = env("REDDIT_CLIENT_ID");
-    
+    auto GIPY_CLIENT_ID = Utils::env("GIPY_CLIENT_ID");
+    auto IMGUR_CLIENT_ID = Utils::env("IMGUR_CLIENT_ID");
+    auto REDDIT_CLIENT_ID = Utils::env("REDDIT_CLIENT_ID");
+
     int stop = 0;
 }
