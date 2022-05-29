@@ -95,7 +95,8 @@ void save_after_to_file(const string& where,
     }
 }
 
-optional<Response> perform_request(const string& url)
+optional<Response> perform_request(const string& url,
+                                   const std::list<string>& headers = {})
 {
     curlpp::Easy request;
 
@@ -108,6 +109,7 @@ optional<Response> perform_request(const string& url)
         request.setOpt<FollowLocation>(true);
         request.setOpt<MaxRedirs>(10);
         request.setOpt<Verbose>(false);
+        request.setOpt<HttpHeader>(headers);
 
         std::stringstream ss;
         request.setOpt<WriteStream>(&ss);
