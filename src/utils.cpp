@@ -99,14 +99,6 @@ std::string remove_invalid_charaters(std::string from)
         replace_fn, '_');
 
     return from;
-
-    //for (auto c : invalid_charaters)
-    //{
-    //    auto noSpaceEnd = std::remove(from.begin(), from.end(), c);
-    //    //from.erase(noSpaceEnd, from.end());
-    //    //std::replace(from.begin(), from.end(), c, '_');
-    //}
-    //int k = 0;
 }
 
 std::string get_file_extension_from_url(const std::string& from)
