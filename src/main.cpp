@@ -13,7 +13,7 @@
 
 auto constexpr g_TITLE_MAX_LEN = 120;
 auto constexpr g_PRINT_MAX_LEN = 50;
-auto constexpr g_num_threads{ 1 }; // num threads
+auto constexpr g_num_threads{ 10 }; // num threads
 
 struct Response
 {
