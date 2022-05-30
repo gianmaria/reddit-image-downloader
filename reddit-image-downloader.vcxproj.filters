@@ -41,7 +41,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
-    <None Include=".env" />
     <None Include="README.md" />
+    <None Include=".env" />
   </ItemGroup>
 </Project>
