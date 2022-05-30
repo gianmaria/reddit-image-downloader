@@ -33,6 +33,36 @@ void run_test()
     auto IMGUR_CLIENT_ID = Utils::env("IMGUR_CLIENT_ID");
     auto REDDIT_CLIENT_ID = Utils::env("REDDIT_CLIENT_ID");
 
+    {
+        assert(Utils::UTF8_len("😀😉😁") == 3);
+        assert(Utils::UTF8_len("ЀЄЋЏ") == 4);
+        assert(Utils::UTF8_len("ЀЄЋЏ") == 4);
+        assert(Utils::UTF8_len("ЍჅდ") == 3);
+
+    }
+
+    {
+        string s = "😀😉😁";
+        Utils::resize_string(s, 1);
+        assert(s == "😀");
+
+        s = "😀😉😁";
+        Utils::resize_string(s, 2);
+        assert(s == "😀😉");
+        
+        s = "😀😉😁";
+        Utils::resize_string(s, 3);
+        assert(s == "😀😉😁");
+
+        s = "hello ЀЄЋЏ 😀😉😁 ЍჅდ world";
+        Utils::resize_string(s, 5);
+        assert(s == "hello");
+        
+        s = "hello ЀЄЋЏ 😀😉😁 ЍჅდ world";
+        Utils::resize_string(s, 9);
+        assert(s == "hello ЀЄЋ");
+
+    }
     int stop = 0;
 }
 

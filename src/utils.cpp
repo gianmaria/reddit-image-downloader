@@ -274,8 +274,42 @@ string env(string_cref name)
 
 void resize_string(string& str, size_t new_len)
 {
-    // TODO: proper resize!!!
-    str.resize(new_len);
+    size_t len = 0;
+
+    size_t byte_count = 0;
+    while (byte_count < str.size())
+    {
+        uint8_t c = static_cast<uint8_t>(str[byte_count]);
+
+        if (len >= new_len)
+            break;
+
+        if ((c >> 7) == 0b0) // 1 byte
+        {
+            byte_count += 1;
+        }
+        else if ((c >> 5) == 0b110) // 2 byte
+        {
+            byte_count += 2;
+        }
+        else if ((c >> 4) == 0b1110) // 3 byte
+        {
+            byte_count += 3;
+        }
+        else if ((c >> 3) == 0b11110) // 4 byte
+        {
+            byte_count += 4;
+        }
+        else
+        {
+            int whut = 0;
+            assert(false);
+        }
+
+        ++len;
+    }
+
+    str.resize(byte_count);
 }
 
 string get_after_from_file(const string& from)
