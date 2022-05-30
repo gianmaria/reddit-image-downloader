@@ -125,7 +125,7 @@ std::string get_file_extension_from_url(const std::string& from)
             }
             else
             {
-                if (std::isalpha(c))
+                if (std::isalnum(c))
                 {
                     buff << c;
                 }
