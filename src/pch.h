@@ -41,3 +41,7 @@ using njson = nlohmann::json;
 using str_cref = const std::string&;
 using vector_cref = const std::vector<nlohmann::json>&;
 using string_cref = const string&;
+
+
+#include "utils.h"
+#include "test.h"

@@ -1,7 +1,5 @@
 #pragma once
 
-#include "pch.h"
-
 namespace Utils
 {
 
@@ -34,5 +32,10 @@ bool is_domain_known(const string& domain);
 string env(string_cref name);
 
 void resize_string(string& str, size_t new_len);
+
+string get_after_from_file(const string& from);
+
+void save_after_to_file(const string& where,
+                        const string& content);
 
 }

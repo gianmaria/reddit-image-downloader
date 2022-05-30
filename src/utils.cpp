@@ -1,5 +1,6 @@
 #include "pch.h"
-#include "utils.h"
+
+//#include "utils.h"
 
 namespace Utils
 {
@@ -275,6 +276,32 @@ void resize_string(string& str, size_t new_len)
 {
     // TODO: proper resize!!!
     str.resize(new_len);
+}
+
+string get_after_from_file(const string& from)
+{
+    std::ifstream ifs(from + "/after.txt");
+
+    string after;
+
+    if (ifs.is_open())
+    {
+        ifs >> after;
+    }
+
+    return after;
+}
+
+void save_after_to_file(const string& where,
+                        const string& content)
+{
+    std::ofstream ofs(where + "/after.txt",
+                      std::ofstream::trunc);
+
+    if (ofs.is_open())
+    {
+        ofs << content;
+    }
 }
 
 }
