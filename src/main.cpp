@@ -11,8 +11,8 @@
 // [] download images inside a gallery! e.g. https://www.reddit.com/gallery/uw2ikr
 
 
-auto constexpr g_TITLE_MAX_LEN = 120;
-auto constexpr g_PRINT_MAX_LEN = 50;
+auto constexpr g_TITLE_MAX_LEN = 50;
+auto constexpr g_PRINT_MAX_LEN = g_TITLE_MAX_LEN;
 auto constexpr g_num_threads{ 10 }; // num threads
 
 struct Response
@@ -209,9 +209,17 @@ std::vector<string> handle_imgur(string_cref subreddit,
 
     string url = "https://api.imgur.com/3/gallery/r/" + subreddit + "/" + image_id;
 
+    auto imgur_client_id = Utils::env("IMGUR_CLIENT_ID");
+    
+    if (imgur_client_id == "")
+    {
+        cout << "[WARN] no client id for imgur inside file .env" << endl;
+        return {};
+    }
+
     auto opt_resp = perform_request(url,
                                     { "Authorization: Client-ID " +
-                                    Utils::env("IMGUR_CLIENT_ID") });
+                                     imgur_client_id });
 
     if (not opt_resp.has_value())
     {
@@ -234,7 +242,7 @@ std::vector<string> handle_imgur(string_cref subreddit,
 
     if (not json["success"].get<bool>())
     {
-        cout << "[ERROR] returned from imgur.com contains an error, status: "
+        cout << "[ERROR] json returned from imgur.com contains an error, status: "
             << json["status"] << endl;
         return {};
     }
@@ -338,13 +346,20 @@ Thread_Res download_media(long file_id,
 
                 auto actual_urls = handle_imgur(subreddit, image_id);
 
-                std::for_each(actual_urls.begin(),
-                              actual_urls.end(),
-                              [&title, &dest_folder, &res, &perform_download](string_cref actual_url)
+                if (actual_urls.size() != 0)
                 {
-                    // TODO: this is problematic.... multiple downloads and only one result....
-                    res.download_res = perform_download(actual_url, title, dest_folder);
-                });
+                    std::for_each(actual_urls.begin(),
+                                  actual_urls.end(),
+                                  [&title, &dest_folder, &res, &perform_download](string_cref actual_url)
+                    {
+                        // TODO: this is problematic.... multiple downloads and only one result....
+                        res.download_res = perform_download(actual_url, title, dest_folder);
+                    });
+                }
+                else
+                {
+                    res.download_res = Download_Res::FAILED;
+                }
             }
             else if (domain == "gfycat.com")
             {
