@@ -315,7 +315,6 @@ Thread_Res download_media(long file_id,
 
         if (Utils::UTF8_len(title) > g_TITLE_MAX_LEN)
         {
-            // TODO: use proper resizing...
             Utils::resize_string(title, g_TITLE_MAX_LEN);
         }
 
@@ -366,7 +365,32 @@ Thread_Res download_media(long file_id,
                 // https://developers.gfycat.com/api/?curl#getting-info-for-a-single-gfycat
                 // ecample: https://api.gfycat.com/v1/gfycats/JampackedUnrulyArcherfish
                 // TODO:
-                res.download_res = Download_Res::UNABLE;
+
+                auto image_id = extract_image_id_from_url(url);
+                const string api_endpoint = "https://api.gfycat.com/v1/gfycats/" + image_id;
+
+                auto resp = perform_request(api_endpoint);
+
+                njson json;
+                json = njson::parse(resp.value().content);
+                
+                string* actual_url = nullptr;
+
+                if (json.contains("gfyItem"))
+                {
+                    if (json["gfyItem"].contains("url"))
+                    {
+                        actual_url = json["gfyItem"]["url"].get_ptr<string*>();
+                    }
+                    else if (json["gfyItem"].contains("mp4Url"))
+                    {
+                        actual_url = json["gfyItem"]["mp4Url"].get_ptr<string*>();
+                    }
+                }
+
+                res.download_res = perform_download(*actual_url, title, dest_folder);
+
+                //res.download_res = Download_Res::UNABLE;
             }
             else
             {
