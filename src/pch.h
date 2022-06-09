@@ -1,7 +1,5 @@
 #pragma once
 
-#include <Windows.h>
-
 #include <exception>
 #include <filesystem>
 #include <format>
@@ -15,7 +13,6 @@
 #include <string>
 #include <thread>
 #include <vector>
-
 
 #include <curlpp/cURLpp.hpp>
 #include <curlpp/Easy.hpp>
@@ -45,3 +42,4 @@ using string_cref = const string&;
 
 #include "utils.h"
 #include "test.h"
+#include "rid.h"

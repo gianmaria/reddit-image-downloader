@@ -1,5 +1,7 @@
 #pragma once
 
+#include "rid.h"
+
 namespace Utils
 {
 
@@ -37,5 +39,11 @@ string get_after_from_file(const string& from);
 
 void save_after_to_file(const string& where,
                         const string& content);
+
+string extract_image_id_from_url(const string& url);
+
+std::ostream& operator<<(std::ostream& os, const Download_Res& dr);
+
+string to_str(const Download_Res& dr);
 
 }

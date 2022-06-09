@@ -1,7 +1,5 @@
 #include "pch.h"
 
-//#include "utils.h"
-
 namespace Utils
 {
 
@@ -336,6 +334,64 @@ void save_after_to_file(const string& where,
     {
         ofs << content;
     }
+}
+
+string extract_image_id_from_url(const string& url)
+{
+    std::stringstream buff;
+
+    bool found = false;
+
+    auto it = url.rbegin();
+
+    // check if url end with '/'
+    if (url.back() == '/')
+        ++it; // skip last character
+
+    for (;
+         it != url.rend();
+         ++it)
+    {
+        if (*it != '/')
+        {
+            buff << *it;
+        }
+        else
+        {
+            found = true;
+            break;
+        }
+    }
+
+    if (!found)
+    {
+        return {};
+    }
+
+    std::string image_id = buff.str();
+    std::reverse(image_id.begin(), image_id.end());
+
+    return image_id;
+}
+
+std::ostream& operator<<(std::ostream& os, const Download_Res& dr)
+{
+    switch (dr)
+    {
+        case Download_Res::INVALID: os << "INVALID ENUM VALUE"; break;
+        case Download_Res::SKIPPED:
+        case Download_Res::DOWNLOADED: os << "( ✅ )"; break;
+        case Download_Res::FAILED: os << "FAILED ( 🛑 )"; break;
+        case Download_Res::UNABLE:  os << "UNABLE  ( ❌ )"; break;
+    }
+    return os;
+}
+
+string to_str(const Download_Res& dr)
+{
+    std::stringstream ss;
+    ss << dr;
+    return ss.str();
 }
 
 }
