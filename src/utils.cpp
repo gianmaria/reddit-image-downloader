@@ -1,5 +1,7 @@
 #include "pch.h"
 
+#include "rid.h"
+
 namespace Utils
 {
 

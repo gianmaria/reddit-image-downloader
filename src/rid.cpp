@@ -1,5 +1,9 @@
 #include "pch.h"
 
+#include "rid.h"
+#include "utils.h"
+#include "test.h"
+
 /* 
 
 TODO:
@@ -12,7 +16,6 @@ TODO:
  [] download images inside a gallery! e.g. https://www.reddit.com/gallery/uw2ikr
  
  */
-
 
 optional<Response> perform_request(const string& url,
                                    const std::list<string>& headers)
@@ -125,10 +128,6 @@ Download_Res perform_download(string_cref url,
     return Download_Res::DOWNLOADED;
 }
 
-
-
-
-
 Download_Res handle_imgur(string_cref subreddit,
                           string_cref url,
                           string_cref title,
@@ -206,7 +205,6 @@ Download_Res handle_imgur(string_cref subreddit,
     }
 }
 
-
 Download_Res handle_gfycat(
     string_cref url,
     string_cref title,
@@ -269,9 +267,6 @@ Download_Res handle_gfycat(
         return Download_Res::FAILED;
     }
 }
-
-
-
 
 Thread_Res download_media(long file_id,
                           const njson& child,

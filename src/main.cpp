@@ -1,5 +1,8 @@
 ﻿#include "pch.h"
 
+#include "test.h"
+#include "rid.h"
+
 int main(int argc, char* argv[])
 {
     SetConsoleCP(CP_UTF8);
