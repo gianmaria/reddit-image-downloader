@@ -210,13 +210,11 @@ Download_Res handle_imgur(string_cref subreddit,
             urls.push_back(json["data"]["link"]);
         }
 
-        std::for_each(urls.begin(),
-                      urls.end(),
-                      [&title, &dest_folder](string_cref actual_url)
+        for (const auto& actual_url : urls)
         {
-            // TODO: this is problematic.... multiple downloads and only one result....
+            // TODO: this is problematic.... potentially multiple downloads and only one result....
             download_file_to_disk(actual_url, title, dest_folder);
-        });
+        }
 
         return Download_Res::DOWNLOADED;
     }
@@ -328,7 +326,7 @@ Thread_Res download_media(long file_id,
 
         Download_Res res = Download_Res::FAILED;
 
-        if (upvote > 1000)
+        if (upvote > g_upvote_threshold)
         {
             if (Utils::get_file_extension_from_url(url) != "")
             {
