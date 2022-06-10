@@ -169,7 +169,7 @@ size_t UTF8_len(const std::string& input)
 
         if ((c >> 7) == 0b0) // 1 byte
         {
-            i += 1;    
+            i += 1;
         }
         else if ((c >> 5) == 0b110) // 2 byte
         {
@@ -381,8 +381,8 @@ std::ostream& operator<<(std::ostream& os, const Download_Res& dr)
     switch (dr)
     {
         case Download_Res::INVALID: os << "INVALID ENUM VALUE"; break;
-        case Download_Res::SKIPPED:
-        case Download_Res::DOWNLOADED: os << "( ✅ )"; break;
+        case Download_Res::SKIPPED: os << "SKIP"; break;
+        case Download_Res::DOWNLOADED: os << "OK ( ✅ )"; break;
         case Download_Res::FAILED: os << "FAILED ( 🛑 )"; break;
         case Download_Res::UNABLE:  os << "UNABLE  ( ❌ )"; break;
     }
