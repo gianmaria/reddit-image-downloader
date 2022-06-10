@@ -22,14 +22,14 @@ enum class Download_Res : uint8_t
 struct Thread_Res
 {
     long file_id = -1;
-    string title = "null";
-    string url = "null";
+    string title = "???";
+    string url = "???";
     Download_Res download_res = Download_Res::INVALID;
 };
 
 
-optional<Response> perform_request(const string& url,
-                                   const std::list<string>& headers = {});
+optional<Response> perform_http_request(const string& url,
+                                        const std::list<string>& headers = {});
 
 optional<string> download_json_from_reddit(
     const string& subreddit,
@@ -38,9 +38,10 @@ optional<string> download_json_from_reddit(
     unsigned limit = 100);
 
 
-Download_Res perform_download(string_cref url,
-                              string_cref title,
-                              string_cref dest_folder);
+Download_Res download_file_to_disk(string_cref url,
+                                   string_cref title,
+                                   string_cref dest_folder,
+                                   string_cref ext = "");
 
 Download_Res handle_imgur(string_cref subreddit,
                           string_cref url,

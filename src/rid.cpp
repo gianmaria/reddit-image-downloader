@@ -4,21 +4,21 @@
 #include "utils.h"
 #include "test.h"
 
-/* 
+/*
 
 TODO:
 [X] multithreading
  [] download images from website other than reddit
     [X] imgur.com
     [] i.imgur.com
-    [] v.redd.it
+    [x] v.redd.it
     [x] gfycat.com
  [] download images inside a gallery! e.g. https://www.reddit.com/gallery/uw2ikr
- 
+
  */
 
-optional<Response> perform_request(const string& url,
-                                   const std::list<string>& headers)
+optional<Response> perform_http_request(const string& url,
+                                        const std::list<string>& headers)
 {
     curlpp::Easy request;
 
@@ -72,7 +72,7 @@ optional<string> download_json_from_reddit(
         reddit_url << "&after=" << after;
     }
 
-    auto opt_resp = perform_request(reddit_url.str());
+    auto opt_resp = perform_http_request(reddit_url.str());
 
     if (!opt_resp.has_value())
         return {};
@@ -91,13 +91,17 @@ optional<string> download_json_from_reddit(
 }
 
 
-Download_Res perform_download(string_cref url,
-                              string_cref title,
-                              string_cref dest_folder)
+Download_Res download_file_to_disk(string_cref url,
+                                   string_cref title,
+                                   string_cref dest_folder,
+                                   string_cref ext)
 {
-    auto ext_from_url = Utils::get_file_extension_from_url(url);
+    auto file_path = dest_folder + "\\" + title + ".";
 
-    auto file_path = dest_folder + "\\" + title + "." + ext_from_url;
+    if (ext != "")
+        file_path += ext;
+    else
+        file_path += Utils::get_file_extension_from_url(url);
 
     if (fs::exists(file_path))
     {
@@ -114,16 +118,17 @@ Download_Res perform_download(string_cref url,
         return Download_Res::FAILED;
     }
 
-    auto opt_res = perform_request(url);
+    auto resp = perform_http_request(url);
 
-    if (not opt_res.has_value())
+    if (not resp.has_value())
     {
         return Download_Res::FAILED;
     }
 
-    auto& res = opt_res.value();
+    if (resp->code != 200)
+        return Download_Res::FAILED;
 
-    ofs << res.content;
+    ofs << resp->content;
 
     return Download_Res::DOWNLOADED;
 }
@@ -152,18 +157,17 @@ Download_Res handle_imgur(string_cref subreddit,
             return Download_Res::FAILED;
         }
 
-        auto opt_resp = perform_request(api_endpoint,
-                                        { "Authorization: Client-ID " +
-                                         imgur_client_id });
+        auto resp = perform_http_request(api_endpoint,
+                                         { "Authorization: Client-ID " +
+                                          imgur_client_id });
 
-        if (not opt_resp.has_value())
-        {
+        if (not resp.has_value())
             return Download_Res::FAILED;
-        }
 
-        auto content = opt_resp.value().content;
+        if (resp->code != 200)
+            return Download_Res::FAILED;
 
-        njson json = njson::parse(content);
+        njson json = njson::parse(resp->content);
 
         if (not json["success"].get<bool>())
         {
@@ -193,7 +197,7 @@ Download_Res handle_imgur(string_cref subreddit,
                       [&title, &dest_folder](string_cref actual_url)
         {
             // TODO: this is problematic.... multiple downloads and only one result....
-            auto res = perform_download(actual_url, title, dest_folder);
+            auto res = download_file_to_disk(actual_url, title, dest_folder);
         });
 
         return Download_Res::DOWNLOADED;
@@ -205,10 +209,9 @@ Download_Res handle_imgur(string_cref subreddit,
     }
 }
 
-Download_Res handle_gfycat(
-    string_cref url,
-    string_cref title,
-    string_cref dest_folder)
+Download_Res handle_gfycat(string_cref url,
+                           string_cref title,
+                           string_cref dest_folder)
 {
     try
     {
@@ -227,10 +230,16 @@ Download_Res handle_gfycat(
 
         const string api_endpoint = "https://api.gfycat.com/v1/gfycats/" + image_id;
 
-        auto resp = perform_request(api_endpoint);
+        auto resp = perform_http_request(api_endpoint);
+
+        if (not resp.has_value())
+            return Download_Res::FAILED;
+
+        if (resp->code != 200)
+            return Download_Res::FAILED;
 
         njson json;
-        json = njson::parse(resp.value().content);
+        json = njson::parse(resp->content);
 
         string* actual_url = nullptr;
 
@@ -256,7 +265,7 @@ Download_Res handle_gfycat(
 
         if (actual_url)
         {
-            res = perform_download(*actual_url, title, dest_folder);
+            res = download_file_to_disk(*actual_url, title, dest_folder);
         }
 
         return res;
@@ -268,14 +277,33 @@ Download_Res handle_gfycat(
     }
 }
 
+Download_Res handle_vreddit(const njson& json,
+                            string_cref url,
+                            string_cref title,
+                            string_cref dest_folder)
+{
+    try
+    {
+        auto& video_url = json["data"]["secure_media"]
+            ["reddit_video"]["fallback_url"].get_ref<string_cref>();
+
+        // TODO: grab the extension from the response headers
+        return download_file_to_disk(video_url, title, dest_folder, "mp4");
+    }
+    catch (...)
+    {
+        // unable to grab the fallback_url, adiossssssss
+        return Download_Res::FAILED;
+    }
+}
+
 Thread_Res download_media(long file_id,
                           const njson& child,
                           const string& dest_folder)
 {
     try
     {
-        Thread_Res res;
-        res.file_id = file_id;
+        Download_Res res = Download_Res::FAILED;
 
         const string& raw_title = child["data"]["title"].get_ref<str_cref>();
 
@@ -286,15 +314,12 @@ Thread_Res download_media(long file_id,
             Utils::resize_string(title, g_TITLE_MAX_LEN);
         }
 
-        res.title = title;
-
         const string& url = child["data"]["url"].get_ref<str_cref>();
-        res.url = url;
 
         if (Utils::get_file_extension_from_url(url) != "")
         {
             // if we have an extension, try direct download
-            res.download_res = perform_download(url, title, dest_folder);
+            res = download_file_to_disk(url, title, dest_folder);
         }
         else
         {
@@ -302,28 +327,30 @@ Thread_Res download_media(long file_id,
 
             if (domain == "v.redd.it")
             {
-                // TODO: handle domain v.redd.it
-                res.download_res = Download_Res::UNABLE;
+                res = handle_vreddit(child, url, title, dest_folder);
             }
             else if (domain == "imgur.com")
             {
                 string_cref subreddit = child["data"]["subreddit"].get_ref<str_cref>();
-                // TODO: handle domain i.imgur.com
-                res.download_res = handle_imgur(subreddit, url,
-                                                title, dest_folder);
+                res = handle_imgur(subreddit, url, title, dest_folder);
             }
             else if (domain == "gfycat.com")
             {
-                res.download_res = handle_gfycat(url, title, dest_folder);
+                res = handle_gfycat(url, title, dest_folder);
             }
             else
             {
                 // unknown domain
-                res.download_res = Download_Res::UNABLE;
+                res = Download_Res::UNABLE;
             }
         }
 
-        return res;
+        return {
+            .file_id = file_id,
+            .title = title,
+            .url = url,
+            .download_res = res,
+        };
     }
     catch (const std::exception& e)
     {
