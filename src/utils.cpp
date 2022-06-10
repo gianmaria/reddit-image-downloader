@@ -378,20 +378,20 @@ string extract_image_id_from_url(const string& url)
     return image_id;
 }
 
-std::ostream& operator<<(std::ostream& os, const Download_Res& dr)
+std::ostream& operator<<(std::ostream& os, const Download_Result& dr)
 {
     switch (dr)
     {
-        case Download_Res::INVALID: os << "INVALID ENUM VALUE"; break;
-        case Download_Res::SKIPPED: os << "SKIP"; break;
-        case Download_Res::DOWNLOADED: os << "OK ( ✅ )"; break;
-        case Download_Res::FAILED: os << "FAILED ( 🛑 )"; break;
-        case Download_Res::UNABLE:  os << "UNABLE  ( ❌ )"; break;
+        case Download_Result::INVALID: os << "INVALID ENUM VALUE"; break;
+        case Download_Result::SKIPPED: os << "SKIP"; break;
+        case Download_Result::DOWNLOADED: os << "OK ( ✅ )"; break;
+        case Download_Result::FAILED: os << "FAILED ( 🛑 )"; break;
+        case Download_Result::UNABLE:  os << "UNABLE  ( ❌ )"; break;
     }
     return os;
 }
 
-string to_str(const Download_Res& dr)
+string to_str(const Download_Result& dr)
 {
     std::stringstream ss;
     ss << dr;
