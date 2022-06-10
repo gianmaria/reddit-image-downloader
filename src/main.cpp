@@ -11,13 +11,10 @@ int main(int argc, char* argv[])
 
     Test::run_test();
 
-#define TESTING 0
-
-#if TESTING
-
-    const string subreddit = "pics"; // "VaporwaveAesthetics";
-    const string when = "month"; // "day"; 
-    const string dest = "picssssz"; // "🌟vaporwave-aesthetics🌟";
+#if FAKE_MAIN_ARGS
+    const string subreddit = "VaporwaveAesthetics"; // "VaporwaveAesthetics";
+    const string when = "all"; // "day"; 
+    const string dest = "VaporwaveAesthetics\\all"; // "🌟vaporwave-aesthetics🌟";
 
     return rid(subreddit, when, dest);
 #else
@@ -30,7 +27,6 @@ int main(int argc, char* argv[])
         .help("choose between: [hour | day | week | month | year | all]");
     program.add_argument("dest-folder")
         .help("the folder where to put all the downloaded images (the folder will be created if it doesn't exit)");
-    program.add_epilog("\nNOTE: At the moment the downloadable format images are limited to: .gif .jpeg .png .jpg .bmp");
 
     try
     {
