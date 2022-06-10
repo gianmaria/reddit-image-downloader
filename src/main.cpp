@@ -12,6 +12,9 @@ int main(int argc, char* argv[])
     Test::run_test();
 
 #if FAKE_MAIN_ARGS
+    (void)argc;
+    (void)argv;
+
     const string subreddit = "VaporwaveAesthetics"; // "VaporwaveAesthetics";
     const string when = "all"; // "day"; 
     const string dest = "VaporwaveAesthetics\\all"; // "🌟vaporwave-aesthetics🌟";
