@@ -81,10 +81,10 @@ void run_test()
                               std::ofstream::binary |
                               std::ofstream::trunc);
             const char* data = response->body.data();
-            std::streamsize size = response->body.size();
+            std::streamsize size = 
+                static_cast<std::streamsize>(response->body.size());
             ofs.write(data, size);
         }
-        int s = 0;
     }
 }
 
