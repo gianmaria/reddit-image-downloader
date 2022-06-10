@@ -17,14 +17,24 @@ TODO:
 
  */
 
-optional<Response> perform_http_request(const string& url,
-                                        const std::list<string>& headers)
+optional<HTTP_Response> perform_http_request(const string& url,
+                                             const std::list<string>& headers)
 {
-    curlpp::Easy request;
-
     try
     {
         using namespace curlpp::options;
+        using namespace curlpp::infos;
+
+        curlpp::Easy request;
+
+        std::stringstream header_ss;
+
+        auto header_function_callback = [&header_ss]
+        (char* buffer, size_t size, size_t nitems) -> size_t
+        {
+            header_ss << string(buffer, size * nitems);
+            return size * nitems;
+        };
 
         request.setOpt<Url>(url);
         request.setOpt<UserAgent>("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36");
@@ -32,15 +42,23 @@ optional<Response> perform_http_request(const string& url,
         request.setOpt<MaxRedirs>(10);
         request.setOpt<Verbose>(false);
         request.setOpt<HttpHeader>(headers);
+        request.setOpt<HeaderFunction>(header_function_callback);
 
-        std::stringstream ss;
-        request.setOpt<WriteStream>(&ss);
+        std::stringstream body_ss(std::ios_base::out |
+                                  std::ios_base::binary);
+        request.setOpt<WriteStream>(&body_ss);
 
         request.perform();
 
-        auto code = curlpp::infos::ResponseCode::get(request);
+        auto code = ResponseCode::get(request);
+        auto content_type = ContentType::get(request);
 
-        return Response{ .content = ss.str(), .code = code };
+        return HTTP_Response{
+            .body = body_ss.str(),
+            .code = code,
+            .content_type = content_type,
+            .resp_headers = header_ss.str()
+        };
     }
     catch (const curlpp::LibcurlRuntimeError& e)
     {
@@ -52,6 +70,46 @@ optional<Response> perform_http_request(const string& url,
         return {};
     }
 }
+
+Download_Res download_file_to_disk(string_cref url,
+                                   string_cref title,
+                                   string_cref dest_folder,
+                                   string_cref ext)
+{
+    auto file_path = dest_folder + "\\" + title + ".";
+
+    if (ext != "")
+        file_path += ext;
+    else
+        file_path += Utils::get_file_extension_from_url(url);
+
+    if (fs::exists(file_path))
+    {
+        return Download_Res::SKIPPED;
+    }
+
+    std::ofstream ofs(file_path,
+                      std::ofstream::binary |
+                      std::ofstream::trunc);
+
+    if (not ofs.is_open())
+    {
+        cout << std::format("[WARN] Cannot open file for writing <{}>", file_path) << endl;
+        return Download_Res::FAILED;
+    }
+
+    auto resp = perform_http_request(url);
+
+    if ((not resp.has_value()) or
+        resp->code != 200)
+        return Download_Res::FAILED;
+
+    ofs.write(resp->body.data(), resp->body.size());
+    ofs.close();
+
+    return Download_Res::DOWNLOADED;
+}
+
 
 optional<string> download_json_from_reddit(
     const string& subreddit,
@@ -87,50 +145,7 @@ optional<string> download_json_from_reddit(
         return {};
     }
 
-    return resp.content;
-}
-
-
-Download_Res download_file_to_disk(string_cref url,
-                                   string_cref title,
-                                   string_cref dest_folder,
-                                   string_cref ext)
-{
-    auto file_path = dest_folder + "\\" + title + ".";
-
-    if (ext != "")
-        file_path += ext;
-    else
-        file_path += Utils::get_file_extension_from_url(url);
-
-    if (fs::exists(file_path))
-    {
-        return Download_Res::SKIPPED;
-    }
-
-    std::ofstream ofs(file_path,
-                      std::ofstream::binary |
-                      std::ofstream::trunc);
-
-    if (not ofs.is_open())
-    {
-        cout << std::format("[WARN] Cannot open file for writing <{}>", file_path) << endl;
-        return Download_Res::FAILED;
-    }
-
-    auto resp = perform_http_request(url);
-
-    if (not resp.has_value())
-    {
-        return Download_Res::FAILED;
-    }
-
-    if (resp->code != 200)
-        return Download_Res::FAILED;
-
-    ofs << resp->content;
-
-    return Download_Res::DOWNLOADED;
+    return resp.body;
 }
 
 Download_Res handle_imgur(string_cref subreddit,
@@ -167,7 +182,7 @@ Download_Res handle_imgur(string_cref subreddit,
         if (resp->code != 200)
             return Download_Res::FAILED;
 
-        njson json = njson::parse(resp->content);
+        njson json = njson::parse(resp->body);
 
         if (not json["success"].get<bool>())
         {
@@ -197,7 +212,7 @@ Download_Res handle_imgur(string_cref subreddit,
                       [&title, &dest_folder](string_cref actual_url)
         {
             // TODO: this is problematic.... multiple downloads and only one result....
-            auto res = download_file_to_disk(actual_url, title, dest_folder);
+            download_file_to_disk(actual_url, title, dest_folder);
         });
 
         return Download_Res::DOWNLOADED;
@@ -213,13 +228,11 @@ Download_Res handle_gfycat(string_cref url,
                            string_cref title,
                            string_cref dest_folder)
 {
+    // https://developers.gfycat.com/api/?curl#getting-info-for-a-single-gfycat
+    // example: https://api.gfycat.com/v1/gfycats/JampackedUnrulyArcherfish
+
     try
     {
-        // https://developers.gfycat.com/api/?curl#getting-info-for-a-single-gfycat
-        // example: https://api.gfycat.com/v1/gfycats/JampackedUnrulyArcherfish
-
-        Download_Res res = Download_Res::FAILED;
-
         string image_id = Utils::extract_image_id_from_url(url);
 
         if (image_id.find_first_of('-') != string::npos)
@@ -239,36 +252,31 @@ Download_Res handle_gfycat(string_cref url,
             return Download_Res::FAILED;
 
         njson json;
-        json = njson::parse(resp->content);
+        json = njson::parse(resp->body);
+
+
+        if (not json.contains("gfyItem"))
+            return Download_Res::FAILED;
+
+        if (json.contains("errorMessage"))
+            return Download_Res::FAILED;
 
         string* actual_url = nullptr;
 
-        if (json.contains("gfyItem"))
+        if (json["gfyItem"].contains("url"))
         {
-            if (json["gfyItem"].contains("url"))
-            {
-                actual_url = json["gfyItem"]["url"].get_ptr<string*>();
-            }
-            else if (json["gfyItem"].contains("mp4Url"))
-            {
-                actual_url = json["gfyItem"]["mp4Url"].get_ptr<string*>();
-            }
-            else
-            {
-                int stop = 0;
-            }
+            actual_url = json["gfyItem"]["url"].get_ptr<string*>();
         }
-        else if (json.contains("errorMessage"))
+        else if (json["gfyItem"].contains("mp4Url"))
         {
-            int stop = 0;
+            actual_url = json["gfyItem"]["mp4Url"].get_ptr<string*>();
+        }
+        else
+        {
+            return Download_Res::FAILED;
         }
 
-        if (actual_url)
-        {
-            res = download_file_to_disk(*actual_url, title, dest_folder);
-        }
-
-        return res;
+        return download_file_to_disk(*actual_url, title, dest_folder);
     }
     catch (const njson::parse_error& e)
     {

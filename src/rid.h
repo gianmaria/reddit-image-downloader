@@ -4,10 +4,12 @@ auto constexpr g_TITLE_MAX_LEN = 50;
 auto constexpr g_PRINT_MAX_LEN = g_TITLE_MAX_LEN;
 auto constexpr g_num_threads{ 1 }; // num threads
 
-struct Response
+struct HTTP_Response
 {
-    string content;
-    long code;
+    string body = "???";
+    long code = -1;
+    string content_type = "???";
+    string resp_headers = "???";
 };
 
 enum class Download_Res : uint8_t
@@ -28,7 +30,7 @@ struct Thread_Res
 };
 
 
-optional<Response> perform_http_request(const string& url,
+optional<HTTP_Response> perform_http_request(const string& url,
                                         const std::list<string>& headers = {});
 
 optional<string> download_json_from_reddit(
