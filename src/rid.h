@@ -2,7 +2,11 @@
 
 auto constexpr g_TITLE_MAX_LEN = 50;
 auto constexpr g_PRINT_MAX_LEN = g_TITLE_MAX_LEN;
+#ifdef _DEBUG
 auto constexpr g_num_threads{ 1 }; // num threads
+#else
+auto constexpr g_num_threads{ 10 }; // num threads
+#endif
 
 struct HTTP_Response
 {
