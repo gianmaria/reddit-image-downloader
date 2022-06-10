@@ -104,7 +104,10 @@ Download_Res download_file_to_disk(string_cref url,
         resp->code != 200)
         return Download_Res::FAILED;
 
-    ofs.write(resp->body.data(), resp->body.size());
+    ofs.write(
+        resp->body.data(), 
+        static_cast<std::streamsize>(resp->body.size())
+    );
     ofs.close();
 
     return Download_Res::DOWNLOADED;
@@ -311,46 +314,54 @@ Thread_Res download_media(long file_id,
 {
     try
     {
-        Download_Res res = Download_Res::FAILED;
-
-        const string& raw_title = child["data"]["title"].get_ref<str_cref>();
-
-        auto title = Utils::remove_invalid_charaters(raw_title);
+        auto title = Utils::remove_invalid_charaters(
+            child["data"]["title"].get_ref<str_cref>());
 
         if (Utils::UTF8_len(title) > g_TITLE_MAX_LEN)
         {
             Utils::resize_string(title, g_TITLE_MAX_LEN);
         }
 
-        const string& url = child["data"]["url"].get_ref<str_cref>();
+        str_cref url = child["data"]["url"].get_ref<str_cref>();
+        
+        unsigned upvote = child["data"]["ups"].get<unsigned>();
 
-        if (Utils::get_file_extension_from_url(url) != "")
-        {
-            // if we have an extension, try direct download
-            res = download_file_to_disk(url, title, dest_folder);
-        }
-        else
-        {
-            const string& domain = child["data"]["domain"].get_ref<str_cref>();
+        Download_Res res = Download_Res::FAILED;
 
-            if (domain == "v.redd.it")
+        if (upvote > 1000)
+        {
+            if (Utils::get_file_extension_from_url(url) != "")
             {
-                res = handle_vreddit(child, url, title, dest_folder);
-            }
-            else if (domain == "imgur.com")
-            {
-                string_cref subreddit = child["data"]["subreddit"].get_ref<str_cref>();
-                res = handle_imgur(subreddit, url, title, dest_folder);
-            }
-            else if (domain == "gfycat.com")
-            {
-                res = handle_gfycat(url, title, dest_folder);
+                // if we have an extension, try direct download
+                res = download_file_to_disk(url, title, dest_folder);
             }
             else
             {
-                // unknown domain
-                res = Download_Res::UNABLE;
+                const string& domain = child["data"]["domain"].get_ref<str_cref>();
+
+                if (domain == "v.redd.it")
+                {
+                    res = handle_vreddit(child, url, title, dest_folder);
+                }
+                else if (domain == "imgur.com")
+                {
+                    string_cref subreddit = child["data"]["subreddit"].get_ref<str_cref>();
+                    res = handle_imgur(subreddit, url, title, dest_folder);
+                }
+                else if (domain == "gfycat.com")
+                {
+                    res = handle_gfycat(url, title, dest_folder);
+                }
+                else
+                {
+                    // unknown domain
+                    res = Download_Res::UNABLE;
+                }
             }
+        }
+        else
+        {
+            res = Download_Res::SKIPPED;
         }
 
         return {
@@ -396,7 +407,13 @@ int rid(const string& subreddit,
         {
             auto resp = download_json_from_reddit(subreddit,
                                                   when,
-                                                  after).value();
+                                                  after);
+
+            if (not resp.has_value())
+            {
+                cout << "[WARN] Cannot download json from subreddit: " << subreddit << endl;
+                break;
+            }
 
 #ifdef _DEBUG 
             // save json to disk for debugging purposes 
@@ -408,12 +425,12 @@ int rid(const string& subreddit,
 
                 if (out.is_open())
                 {
-                    out << resp;
+                    out << *resp;
                 }
             }
 #endif 
 
-            njson json = njson::parse(resp);
+            njson json = njson::parse(*resp);
 
             if (not (json.contains("data") and
                 json["data"].contains("children")))
@@ -421,7 +438,7 @@ int rid(const string& subreddit,
                 throw std::runtime_error("Unexpected json content... 😳");
             }
 
-            const auto& children = json["data"]["children"].get_ref<vector_cref>();
+            vector_cref children = json["data"]["children"].get_ref<vector_cref>();
 
             auto files_to_download = children.size();
             //cout << "[INFO] Downlaoading " << file_to_download << " files" << endl;
@@ -430,6 +447,7 @@ int rid(const string& subreddit,
             {
                 std::array<std::future<Thread_Res>, g_num_threads> threads;
 
+                // spawn threads for media downloading
                 for (size_t i = 0;
                      i < g_num_threads and
                      files_to_download > 0;
@@ -446,26 +464,27 @@ int rid(const string& subreddit,
                     --files_to_download;
                 }
 
+                // print thread results
                 for (auto& thread : threads)
                 {
                     if (thread.valid())
                     {
-                        auto res = thread.get(); // blocking, calls wait()
-                        if (res.download_res == Download_Res::DOWNLOADED or
-                            res.download_res == Download_Res::SKIPPED)
+                        auto thread_res = thread.get(); // blocking, calls wait()
+                        if (thread_res.download_res == Download_Res::DOWNLOADED or
+                            thread_res.download_res == Download_Res::SKIPPED)
                         {
-                            cout << std::format("[{}] {:<{}.{}} -> {}",
-                                                res.file_id,
-                                                res.title, g_PRINT_MAX_LEN, g_PRINT_MAX_LEN,
-                                                Utils::to_str(res.download_res)) << endl;
+                            cout << std::format("[{:04}] {:<{}.{}} -> {}",
+                                                thread_res.file_id,
+                                                thread_res.title, g_PRINT_MAX_LEN, g_PRINT_MAX_LEN,
+                                                Utils::to_str(thread_res.download_res)) << endl;
                         }
                         else
                         {
-                            cout << std::format("[{}] {:<{}.{}} -> {} url: '{}'",
-                                                res.file_id,
-                                                res.title, g_PRINT_MAX_LEN, g_PRINT_MAX_LEN,
-                                                Utils::to_str(res.download_res),
-                                                res.url) << endl;
+                            cout << std::format("[{:04}] {:<{}.{}} -> {} url: '{}'",
+                                                thread_res.file_id,
+                                                thread_res.title, g_PRINT_MAX_LEN, g_PRINT_MAX_LEN,
+                                                Utils::to_str(thread_res.download_res),
+                                                thread_res.url) << endl;
                         }
                     }
                 }
@@ -473,7 +492,7 @@ int rid(const string& subreddit,
 
             if (json["data"]["after"].is_null())
             {
-                // nothing left do do, we download everything
+                // nothing left do do, we downloaded everything
                 cout << "All done!" << endl;
                 fs::remove(dest_folder + "/after.txt");
                 break;
