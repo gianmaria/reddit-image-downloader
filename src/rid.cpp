@@ -17,14 +17,24 @@ TODO:
 
  */
 
-optional<Response> perform_http_request(const string& url,
-                                        const std::list<string>& headers)
+optional<HTTP_Response> perform_http_request(const string& url,
+                                             const std::list<string>& headers)
 {
-    curlpp::Easy request;
-
     try
     {
         using namespace curlpp::options;
+        using namespace curlpp::infos;
+
+        curlpp::Easy request;
+
+        std::stringstream header_ss;
+
+        auto header_function_callback = [&header_ss]
+        (char* buffer, size_t size, size_t nitems) -> size_t
+        {
+            header_ss << string(buffer, size * nitems);
+            return size * nitems;
+        };
 
         request.setOpt<Url>(url);
         request.setOpt<UserAgent>("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36");
@@ -32,15 +42,23 @@ optional<Response> perform_http_request(const string& url,
         request.setOpt<MaxRedirs>(10);
         request.setOpt<Verbose>(false);
         request.setOpt<HttpHeader>(headers);
+        request.setOpt<HeaderFunction>(header_function_callback);
 
-        std::stringstream ss;
-        request.setOpt<WriteStream>(&ss);
+        std::stringstream body_ss(std::ios_base::out |
+                                  std::ios_base::binary);
+        request.setOpt<WriteStream>(&body_ss);
 
         request.perform();
 
-        auto code = curlpp::infos::ResponseCode::get(request);
+        auto code = ResponseCode::get(request);
+        auto content_type = ContentType::get(request);
 
-        return Response{ .content = ss.str(), .code = code };
+        return HTTP_Response{
+            .body = body_ss.str(),
+            .code = code,
+            .content_type = content_type,
+            .resp_headers = header_ss.str()
+        };
     }
     catch (const curlpp::LibcurlRuntimeError& e)
     {
@@ -52,6 +70,49 @@ optional<Response> perform_http_request(const string& url,
         return {};
     }
 }
+
+Download_Res download_file_to_disk(string_cref url,
+                                   string_cref title,
+                                   string_cref dest_folder,
+                                   string_cref ext)
+{
+    auto file_path = dest_folder + "\\" + title + ".";
+
+    if (ext != "")
+        file_path += ext;
+    else
+        file_path += Utils::get_file_extension_from_url(url);
+
+    if (fs::exists(file_path))
+    {
+        return Download_Res::SKIPPED;
+    }
+
+    std::ofstream ofs(file_path,
+                      std::ofstream::binary |
+                      std::ofstream::trunc);
+
+    if (not ofs.is_open())
+    {
+        cout << std::format("[WARN] Cannot open file for writing <{}>", file_path) << endl;
+        return Download_Res::FAILED;
+    }
+
+    auto resp = perform_http_request(url);
+
+    if ((not resp.has_value()) or
+        resp->code != 200)
+        return Download_Res::FAILED;
+
+    ofs.write(
+        resp->body.data(), 
+        static_cast<std::streamsize>(resp->body.size())
+    );
+    ofs.close();
+
+    return Download_Res::DOWNLOADED;
+}
+
 
 optional<string> download_json_from_reddit(
     const string& subreddit,
@@ -87,50 +148,7 @@ optional<string> download_json_from_reddit(
         return {};
     }
 
-    return resp.content;
-}
-
-
-Download_Res download_file_to_disk(string_cref url,
-                                   string_cref title,
-                                   string_cref dest_folder,
-                                   string_cref ext)
-{
-    auto file_path = dest_folder + "\\" + title + ".";
-
-    if (ext != "")
-        file_path += ext;
-    else
-        file_path += Utils::get_file_extension_from_url(url);
-
-    if (fs::exists(file_path))
-    {
-        return Download_Res::SKIPPED;
-    }
-
-    std::ofstream ofs(file_path,
-                      std::ofstream::binary |
-                      std::ofstream::trunc);
-
-    if (not ofs.is_open())
-    {
-        cout << std::format("[WARN] Cannot open file for writing <{}>", file_path) << endl;
-        return Download_Res::FAILED;
-    }
-
-    auto resp = perform_http_request(url);
-
-    if (not resp.has_value())
-    {
-        return Download_Res::FAILED;
-    }
-
-    if (resp->code != 200)
-        return Download_Res::FAILED;
-
-    ofs << resp->content;
-
-    return Download_Res::DOWNLOADED;
+    return resp.body;
 }
 
 Download_Res handle_imgur(string_cref subreddit,
@@ -167,7 +185,7 @@ Download_Res handle_imgur(string_cref subreddit,
         if (resp->code != 200)
             return Download_Res::FAILED;
 
-        njson json = njson::parse(resp->content);
+        njson json = njson::parse(resp->body);
 
         if (not json["success"].get<bool>())
         {
@@ -192,13 +210,11 @@ Download_Res handle_imgur(string_cref subreddit,
             urls.push_back(json["data"]["link"]);
         }
 
-        std::for_each(urls.begin(),
-                      urls.end(),
-                      [&title, &dest_folder](string_cref actual_url)
+        for (const auto& actual_url : urls)
         {
-            // TODO: this is problematic.... multiple downloads and only one result....
-            auto res = download_file_to_disk(actual_url, title, dest_folder);
-        });
+            // TODO: this is problematic.... potentially multiple downloads and only one result....
+            download_file_to_disk(actual_url, title, dest_folder);
+        }
 
         return Download_Res::DOWNLOADED;
     }
@@ -213,13 +229,11 @@ Download_Res handle_gfycat(string_cref url,
                            string_cref title,
                            string_cref dest_folder)
 {
+    // https://developers.gfycat.com/api/?curl#getting-info-for-a-single-gfycat
+    // example: https://api.gfycat.com/v1/gfycats/JampackedUnrulyArcherfish
+
     try
     {
-        // https://developers.gfycat.com/api/?curl#getting-info-for-a-single-gfycat
-        // example: https://api.gfycat.com/v1/gfycats/JampackedUnrulyArcherfish
-
-        Download_Res res = Download_Res::FAILED;
-
         string image_id = Utils::extract_image_id_from_url(url);
 
         if (image_id.find_first_of('-') != string::npos)
@@ -239,36 +253,31 @@ Download_Res handle_gfycat(string_cref url,
             return Download_Res::FAILED;
 
         njson json;
-        json = njson::parse(resp->content);
+        json = njson::parse(resp->body);
+
+
+        if (not json.contains("gfyItem"))
+            return Download_Res::FAILED;
+
+        if (json.contains("errorMessage"))
+            return Download_Res::FAILED;
 
         string* actual_url = nullptr;
 
-        if (json.contains("gfyItem"))
+        if (json["gfyItem"].contains("url"))
         {
-            if (json["gfyItem"].contains("url"))
-            {
-                actual_url = json["gfyItem"]["url"].get_ptr<string*>();
-            }
-            else if (json["gfyItem"].contains("mp4Url"))
-            {
-                actual_url = json["gfyItem"]["mp4Url"].get_ptr<string*>();
-            }
-            else
-            {
-                int stop = 0;
-            }
+            actual_url = json["gfyItem"]["url"].get_ptr<string*>();
         }
-        else if (json.contains("errorMessage"))
+        else if (json["gfyItem"].contains("mp4Url"))
         {
-            int stop = 0;
+            actual_url = json["gfyItem"]["mp4Url"].get_ptr<string*>();
+        }
+        else
+        {
+            return Download_Res::FAILED;
         }
 
-        if (actual_url)
-        {
-            res = download_file_to_disk(*actual_url, title, dest_folder);
-        }
-
-        return res;
+        return download_file_to_disk(*actual_url, title, dest_folder);
     }
     catch (const njson::parse_error& e)
     {
@@ -303,46 +312,54 @@ Thread_Res download_media(long file_id,
 {
     try
     {
-        Download_Res res = Download_Res::FAILED;
-
-        const string& raw_title = child["data"]["title"].get_ref<str_cref>();
-
-        auto title = Utils::remove_invalid_charaters(raw_title);
+        auto title = Utils::remove_invalid_charaters(
+            child["data"]["title"].get_ref<str_cref>());
 
         if (Utils::UTF8_len(title) > g_TITLE_MAX_LEN)
         {
             Utils::resize_string(title, g_TITLE_MAX_LEN);
         }
 
-        const string& url = child["data"]["url"].get_ref<str_cref>();
+        str_cref url = child["data"]["url"].get_ref<str_cref>();
+        
+        unsigned upvote = child["data"]["ups"].get<unsigned>();
 
-        if (Utils::get_file_extension_from_url(url) != "")
-        {
-            // if we have an extension, try direct download
-            res = download_file_to_disk(url, title, dest_folder);
-        }
-        else
-        {
-            const string& domain = child["data"]["domain"].get_ref<str_cref>();
+        Download_Res res = Download_Res::FAILED;
 
-            if (domain == "v.redd.it")
+        if (upvote > g_upvote_threshold)
+        {
+            if (Utils::get_file_extension_from_url(url) != "")
             {
-                res = handle_vreddit(child, url, title, dest_folder);
-            }
-            else if (domain == "imgur.com")
-            {
-                string_cref subreddit = child["data"]["subreddit"].get_ref<str_cref>();
-                res = handle_imgur(subreddit, url, title, dest_folder);
-            }
-            else if (domain == "gfycat.com")
-            {
-                res = handle_gfycat(url, title, dest_folder);
+                // if we have an extension, try direct download
+                res = download_file_to_disk(url, title, dest_folder);
             }
             else
             {
-                // unknown domain
-                res = Download_Res::UNABLE;
+                const string& domain = child["data"]["domain"].get_ref<str_cref>();
+
+                if (domain == "v.redd.it")
+                {
+                    res = handle_vreddit(child, url, title, dest_folder);
+                }
+                else if (domain == "imgur.com")
+                {
+                    string_cref subreddit = child["data"]["subreddit"].get_ref<str_cref>();
+                    res = handle_imgur(subreddit, url, title, dest_folder);
+                }
+                else if (domain == "gfycat.com")
+                {
+                    res = handle_gfycat(url, title, dest_folder);
+                }
+                else
+                {
+                    // unknown domain
+                    res = Download_Res::UNABLE;
+                }
             }
+        }
+        else
+        {
+            res = Download_Res::SKIPPED;
         }
 
         return {
@@ -388,7 +405,13 @@ int rid(const string& subreddit,
         {
             auto resp = download_json_from_reddit(subreddit,
                                                   when,
-                                                  after).value();
+                                                  after);
+
+            if (not resp.has_value())
+            {
+                cout << "[WARN] Cannot download json from subreddit: " << subreddit << endl;
+                break;
+            }
 
 #ifdef _DEBUG 
             // save json to disk for debugging purposes 
@@ -400,12 +423,12 @@ int rid(const string& subreddit,
 
                 if (out.is_open())
                 {
-                    out << resp;
+                    out << *resp;
                 }
             }
 #endif 
 
-            njson json = njson::parse(resp);
+            njson json = njson::parse(*resp);
 
             if (not (json.contains("data") and
                 json["data"].contains("children")))
@@ -413,7 +436,7 @@ int rid(const string& subreddit,
                 throw std::runtime_error("Unexpected json content... 😳");
             }
 
-            const auto& children = json["data"]["children"].get_ref<vector_cref>();
+            vector_cref children = json["data"]["children"].get_ref<vector_cref>();
 
             auto files_to_download = children.size();
             //cout << "[INFO] Downlaoading " << file_to_download << " files" << endl;
@@ -422,6 +445,7 @@ int rid(const string& subreddit,
             {
                 std::array<std::future<Thread_Res>, g_num_threads> threads;
 
+                // spawn threads for media downloading
                 for (size_t i = 0;
                      i < g_num_threads and
                      files_to_download > 0;
@@ -438,26 +462,27 @@ int rid(const string& subreddit,
                     --files_to_download;
                 }
 
+                // print thread results
                 for (auto& thread : threads)
                 {
                     if (thread.valid())
                     {
-                        auto res = thread.get(); // blocking, calls wait()
-                        if (res.download_res == Download_Res::DOWNLOADED or
-                            res.download_res == Download_Res::SKIPPED)
+                        auto thread_res = thread.get(); // blocking, calls wait()
+                        if (thread_res.download_res == Download_Res::DOWNLOADED or
+                            thread_res.download_res == Download_Res::SKIPPED)
                         {
-                            cout << std::format("[{}] {:<{}.{}} -> {}",
-                                                res.file_id,
-                                                res.title, g_PRINT_MAX_LEN, g_PRINT_MAX_LEN,
-                                                Utils::to_str(res.download_res)) << endl;
+                            cout << std::format("[{:04}] {:<{}.{}} -> {}",
+                                                thread_res.file_id,
+                                                thread_res.title, g_PRINT_MAX_LEN, g_PRINT_MAX_LEN,
+                                                Utils::to_str(thread_res.download_res)) << endl;
                         }
                         else
                         {
-                            cout << std::format("[{}] {:<{}.{}} -> {} url: '{}'",
-                                                res.file_id,
-                                                res.title, g_PRINT_MAX_LEN, g_PRINT_MAX_LEN,
-                                                Utils::to_str(res.download_res),
-                                                res.url) << endl;
+                            cout << std::format("[{:04}] {:<{}.{}} -> {} url: '{}'",
+                                                thread_res.file_id,
+                                                thread_res.title, g_PRINT_MAX_LEN, g_PRINT_MAX_LEN,
+                                                Utils::to_str(thread_res.download_res),
+                                                thread_res.url) << endl;
                         }
                     }
                 }
@@ -465,7 +490,7 @@ int rid(const string& subreddit,
 
             if (json["data"]["after"].is_null())
             {
-                // nothing left do do, we download everything
+                // nothing left do do, we downloaded everything
                 cout << "All done!" << endl;
                 fs::remove(dest_folder + "/after.txt");
                 break;

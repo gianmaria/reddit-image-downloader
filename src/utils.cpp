@@ -158,39 +158,40 @@ size_t UTF8_len(const std::string& input)
     const char* data = input.data();
     size_t size = input.size();
 
-    size_t len = 0;
+    size_t num_of_characters = 0;
 
-    size_t i = 0;
-    while (i < size)
+    size_t offset = 0;
+    while (offset < size)
     {
-        ++len;
+        ++num_of_characters;
 
-        uint8_t c = static_cast<uint8_t>(data[i]);
+        uint8_t c = static_cast<uint8_t>(data[offset]);
 
         if ((c >> 7) == 0b0) // 1 byte
         {
-            i += 1;
+            offset += 1;
         }
         else if ((c >> 5) == 0b110) // 2 byte
         {
-            i += 2;
+            offset += 2;
         }
         else if ((c >> 4) == 0b1110) // 3 byte
         {
-            i += 3;
+            offset += 3;
         }
         else if ((c >> 3) == 0b11110) // 4 byte
         {
-            i += 4;
+            offset += 4;
         }
         else
         {
-            int whut = 0;
-            assert(false);
+            auto emsg = std::format("Invalid character in string while calculating len, character: '{}' offset: {}",
+                                    c, offset);
+            throw std::runtime_error(emsg);
         }
     }
 
-    return len;
+    return num_of_characters;
 }
 
 bool is_extension_allowed(const string& ext)
@@ -272,44 +273,45 @@ string env(string_cref name)
     return res;
 }
 
-void resize_string(string& str, size_t new_len)
+void resize_string(string& str, size_t new_len_in_characters)
 {
-    size_t len = 0;
+    size_t num_of_characters = 0;
 
-    size_t byte_count = 0;
-    while (byte_count < str.size())
+    size_t offset = 0;
+    while (offset < str.size())
     {
-        uint8_t c = static_cast<uint8_t>(str[byte_count]);
+        uint8_t c = static_cast<uint8_t>(str[offset]);
 
-        if (len >= new_len)
+        if (num_of_characters >= new_len_in_characters)
             break;
 
         if ((c >> 7) == 0b0) // 1 byte
         {
-            byte_count += 1;
+            offset += 1;
         }
         else if ((c >> 5) == 0b110) // 2 byte
         {
-            byte_count += 2;
+            offset += 2;
         }
         else if ((c >> 4) == 0b1110) // 3 byte
         {
-            byte_count += 3;
+            offset += 3;
         }
         else if ((c >> 3) == 0b11110) // 4 byte
         {
-            byte_count += 4;
+            offset += 4;
         }
         else
         {
-            int whut = 0;
-            assert(false);
+            auto emsg = std::format("Invalid value in string while resizing, value: '{}' offset: {}",
+                                    c, offset);
+            throw std::runtime_error(emsg);
         }
 
-        ++len;
+        ++num_of_characters;
     }
 
-    str.resize(byte_count);
+    str.resize(offset);
 }
 
 string get_after_from_file(const string& from)

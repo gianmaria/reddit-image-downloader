@@ -1,6 +1,7 @@
 #include "pch.h"
 
 #include "utils.h"
+#include "rid.h"
 
 namespace Test
 {
@@ -51,7 +52,7 @@ void run_test()
         s = "😀😉😁";
         Utils::resize_string(s, 2);
         assert(s == "😀😉");
-        
+
         s = "😀😉😁";
         Utils::resize_string(s, 3);
         assert(s == "😀😉😁");
@@ -59,13 +60,32 @@ void run_test()
         s = "hello ЀЄЋЏ 😀😉😁 ЍჅდ world";
         Utils::resize_string(s, 5);
         assert(s == "hello");
-        
+
         s = "hello ЀЄЋЏ 😀😉😁 ЍჅდ world";
         Utils::resize_string(s, 9);
         assert(s == "hello ЀЄЋ");
 
     }
-    int stop = 0;
+
+    {
+        string url = "https://v.redd.it/r7gh3btvonx31/DASH_720?source=fallback";
+
+        auto response = perform_http_request(url);
+
+        if (not response.has_value())
+            return;
+
+        if (response->content_type == "video/mp4")
+        {
+            std::ofstream ofs("test.mp4",
+                              std::ofstream::binary |
+                              std::ofstream::trunc);
+            const char* data = response->body.data();
+            std::streamsize size = 
+                static_cast<std::streamsize>(response->body.size());
+            ofs.write(data, size);
+        }
+    }
 }
 
 }
