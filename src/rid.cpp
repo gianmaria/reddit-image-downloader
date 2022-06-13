@@ -140,7 +140,7 @@ optional<string> download_json_from_reddit(
     return resp.body;
 }
 
-std::vector<string> handle_imgur(string_cref subreddit,
+std::vector<string> get_url_from_imgur(string_cref subreddit,
                                  string_cref url)
 {
     // https://apidocs.imgur.com/#10456589-7167-4b5c-acd3-a1e4eb6a95ed
@@ -206,14 +206,14 @@ std::vector<string> handle_imgur(string_cref subreddit,
     }
 }
 
-string handle_gfycat(string_cref url)
+string get_url_from_gfycat(string_cref orig_url)
 {
     // https://developers.gfycat.com/api/?curl#getting-info-for-a-single-gfycat
     // example: https://api.gfycat.com/v1/gfycats/JampackedUnrulyArcherfish
 
     try
     {
-        string image_id = Utils::extract_image_id_from_url(url);
+        string image_id = Utils::extract_image_id_from_url(orig_url);
 
         if (image_id.find_first_of('-') != string::npos)
         {
@@ -265,7 +265,7 @@ string handle_gfycat(string_cref url)
     }
 }
 
-string handle_vreddit(const njson& child)
+string get_url_from_vreddit(const njson& child)
 {
     try
     {
@@ -293,7 +293,7 @@ Thread_Result download_media(long file_id,
         if (Utils::UTF8_len(title) > g_TITLE_MAX_LEN)
             Utils::resize_string(title, g_TITLE_MAX_LEN);
 
-        str_cref try_url = child["data"]["url"].get_ref<str_cref>();
+        auto orig_url = child["data"]["url"].get_ref<string_cref>();
 
         unsigned upvote = child["data"]["ups"].get<unsigned>();
 
@@ -302,35 +302,53 @@ Thread_Result download_media(long file_id,
             return {
                 .file_id = file_id,
                 .title = title,
-                .url = try_url,
+                .url = orig_url,
                 .download_res = Download_Result::SKIPPED,
             };
         }
 
-        string url = try_url;
-        auto extension = Utils::get_file_extension_from_url(url);
+        const string& domain = child["data"]["domain"].get_ref<str_cref>();
 
-        if (extension == "")
+        vector<string> urls;
+        urls.reserve(10); // feels like 10 is a good number
+
+        if (domain == "v.redd.it")
         {
-            const string& domain = child["data"]["domain"].get_ref<str_cref>();
+            urls.push_back(get_url_from_vreddit(child));
+        }
+        else if (domain == "imgur.com")
+        {
+            string_cref subreddit = child["data"]["subreddit"].get_ref<str_cref>();
 
-            if (domain == "v.redd.it")
+            urls = get_url_from_imgur(subreddit, orig_url);
+        }
+        else if (domain == "gfycat.com")
+        {
+            urls.push_back(get_url_from_gfycat(orig_url));
+        }
+        else
+        {
+            if (Utils::get_file_extension_from_url(orig_url) != "")
             {
-                url = handle_vreddit(child);
+                urls.push_back(orig_url);
             }
-            else if (domain == "imgur.com")
+            else
             {
-                string_cref subreddit = child["data"]["subreddit"].get_ref<str_cref>();
+                // unknown domain and no extension, no good
+                return {
+                    .file_id = file_id,
+                    .title = title,
+                    .url = orig_url,
+                    .download_res = Download_Result::UNABLE,
+                };
+            }
+        }
 
-                auto urls = handle_imgur(subreddit, url);
-                // TODO: mhhhhhhhhhhhhhh
-                url = urls[0];
-            }
-            else if (domain == "gfycat.com")
-            {
-                url = handle_gfycat(url);
-            }
+        Download_Result download_result = Download_Result::INVALID;
 
+        // TODO: how to hande multiple download from a signle url....
+        for (const auto& url : urls)
+        {
             auto resp = perform_http_request(url);
 
             auto split_line = [](string_cref line)
@@ -350,21 +368,19 @@ Thread_Result download_media(long file_id,
                 return res;
             };
 
-            extension = split_line(resp->content_type).second;
+            auto extension = split_line(resp->content_type).second;
 
+            auto destination = std::format("{}\\{}.{}",
+                                           dest_folder, title, extension);
+            download_result = download_file_to_disk(url, destination);
         }
-
-        // once we have the extension use direct downlaod
-        auto destination = std::format("{}\\[{}k]{}.{}",
-                                       dest_folder, upvote/1000, title, extension);
-
-        auto download_result = download_file_to_disk(url, destination);
 
         return {
             .file_id = file_id,
             .title = title,
-            .url = url,
-            .download_res = download_result,
+            .url = orig_url,
+            // TODO: mhhhhhhhhhhhhhhhhhh
+            .download_res = Download_Result::DOWNLOADED,
         };
 
     }

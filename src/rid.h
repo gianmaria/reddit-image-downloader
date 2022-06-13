@@ -50,14 +50,14 @@ Download_Result download_file_to_disk(
     string_cref url,
     string_cref destination);
 
-std::vector<string> handle_imgur(
+std::vector<string> get_url_from_imgur(
     string_cref subreddit,
     string_cref url);
 
-string handle_gfycat(
+string get_url_from_gfycat(
     string_cref url);
 
-string handle_vreddit(
+string get_url_from_vreddit(
     const njson& child);
 
 Thread_Result download_media(
