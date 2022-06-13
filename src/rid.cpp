@@ -355,8 +355,8 @@ Thread_Result download_media(long file_id,
         }
 
         // once we have the extension use direct downlaod
-        auto destination = std::format("{}\\[{}]{}.{}",
-                                       dest_folder, upvote, title, extension);
+        auto destination = std::format("{}\\[{}k]{}.{}",
+                                       dest_folder, upvote/1000, title, extension);
 
         auto download_result = download_file_to_disk(url, destination);
 
