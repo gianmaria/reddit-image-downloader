@@ -71,6 +71,56 @@ optional<HTTP_Response> perform_http_request(const string& url,
     }
 }
 
+optional<HTTP_Response> request_headers_only(const string& url,
+                                             const std::list<string>& headers)
+{
+    try
+    {
+        using namespace curlpp::options;
+        using namespace curlpp::infos;
+
+        curlpp::Easy request;
+
+        std::stringstream header_ss;
+
+        auto header_function_callback = [&header_ss]
+        (char* buffer, size_t size, size_t nitems) -> size_t
+        {
+            header_ss << string(buffer, size * nitems);
+            return size * nitems;
+        };
+
+        request.setOpt<Url>(url);
+        request.setOpt<UserAgent>("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36");
+        request.setOpt<FollowLocation>(true);
+        request.setOpt<MaxRedirs>(10);
+        request.setOpt<HttpHeader>(headers);
+        request.setOpt<HeaderFunction>(header_function_callback);
+        request.setOpt<NoBody>(true);
+
+        request.perform();
+
+        auto code = ResponseCode::get(request);
+        auto content_type = ContentType::get(request);
+
+        return HTTP_Response{
+            .body = "",
+            .code = code,
+            .content_type = content_type,
+            .resp_headers = header_ss.str()
+        };
+    }
+    catch (const curlpp::LibcurlRuntimeError& e)
+    {
+        cout <<
+            std::format("[ERROR] perform_request() failed with code {}: \"{}\"",
+                        static_cast<int>(e.whatCode()), (e.what()))
+            << endl;
+
+        return {};
+    }
+}
+
 Download_Result download_file_to_disk(string_cref url,
                                       string_cref destination)
 {
@@ -349,7 +399,16 @@ Thread_Result download_media(long file_id,
         // TODO: how to hande multiple download from a signle url....
         for (const auto& url : urls)
         {
-            auto resp = perform_http_request(url);
+            auto resp = request_headers_only(url);
+
+            if (not resp.has_value())
+                return {
+                    .file_id = file_id,
+                    .title = title,
+                    .url = orig_url,
+                    // TODO: mhhhhhhhhhhhhhhhhhh
+                    .download_res = Download_Result::FAILED
+                };
 
             // TODO: big ass assumption that Utils::split_string return al least 2 values here
             auto extension = Utils::split_string(resp->content_type, "/")[1];

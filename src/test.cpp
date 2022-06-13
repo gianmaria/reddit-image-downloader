@@ -130,7 +130,6 @@ void run_test()
         assert(res[1] == "val2");
 
 
-        int stop = 0;
     }
 }
 

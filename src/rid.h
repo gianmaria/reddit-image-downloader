@@ -39,6 +39,10 @@ optional<HTTP_Response> perform_http_request(
     const string& url,
     const std::list<string>& headers = {});
 
+optional<HTTP_Response> request_headers_only(
+    const string& url,
+    const std::list<string>& headers = {});
+
 optional<string> download_json_from_reddit(
     const string& subreddit,
     const string& when,
