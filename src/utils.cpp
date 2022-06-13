@@ -398,4 +398,28 @@ string to_str(const Download_Result& dr)
     return ss.str();
 }
 
+vector<string> split_string(string_cref str,
+                            string_cref delimiter)
+{
+    vector<string> res;
+    res.reserve(10);
+
+    size_t from = 0;
+    size_t to = str.find(delimiter, from);
+
+    while (to != std::string::npos)
+    {
+        string tmp = str.substr(from, to - from);
+        res.push_back(std::move(tmp));
+        
+        from = to + delimiter.length();
+        to = str.find(delimiter, from);
+    }
+
+    string tmp = str.substr(from);
+    res.push_back(std::move(tmp));
+
+    return res;
+}
+
 }

@@ -86,6 +86,52 @@ void run_test()
             ofs.write(data, size);
         }
     }
+
+
+    {
+        string s = "ciao/come/stai//";
+
+        auto res = Utils::split_string(s, "/");
+
+        assert(res.size() == 5);
+        assert(res[0] == "ciao");
+        assert(res[1] == "come");
+        assert(res[2] == "stai");
+        assert(res[3] == "");
+        assert(res[3] == "");
+
+        s = "a=b";
+        res = Utils::split_string(s, "=");
+        assert(res.size() == 2);
+        assert(res[0] == "a");
+        assert(res[1] == "b");
+
+        s = "a?b";
+        res = Utils::split_string(s, "=");
+        assert(res.size() == 1);
+        assert(res[0] == "a?b");
+
+        s = "https://www.foobaz.com/index.html?par1=val1&par2=val2";
+        res = Utils::split_string(s, "?");
+        assert(res.size() == 2);
+        assert(res[0] == "https://www.foobaz.com/index.html");
+        assert(res[1] == "par1=val1&par2=val2");
+
+        s = res[1];
+        res = Utils::split_string(s, "&");
+        assert(res.size() == 2);
+        assert(res[0] == "par1=val1");
+        assert(res[1] == "par2=val2");
+
+        s = res[1];
+        res = Utils::split_string(s, "=");
+        assert(res.size() == 2);
+        assert(res[0] == "par2");
+        assert(res[1] == "val2");
+
+
+        int stop = 0;
+    }
 }
 
 }

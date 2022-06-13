@@ -15,9 +15,9 @@ int main(int argc, char* argv[])
     (void)argc;
     (void)argv;
 
-    const string subreddit = "memes"; // "VaporwaveAesthetics";
-    const string when = "day"; // "day"; 
-    const string dest = "memes\\day"; // "🌟vaporwave-aesthetics🌟";
+    const string subreddit = "VaporwaveAesthetics"; // "VaporwaveAesthetics";
+    const string when = "week"; // "day"; 
+    const string dest = "🌟vaporwave-aesthetics🌟\\week"; // "🌟vaporwave-aesthetics🌟";
 
     return rid(subreddit, when, dest);
 #else

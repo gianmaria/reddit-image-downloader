@@ -179,6 +179,7 @@ std::vector<string> get_url_from_imgur(string_cref subreddit,
         }
 
         std::vector<string> urls;
+        urls.reserve(20); // feels like 20 is a good number
 
         if (json["data"].contains("images"))
         {
@@ -292,8 +293,9 @@ Thread_Result download_media(long file_id,
 
         auto orig_url = child["data"]["url"].get_ref<string_cref>();
 
-        unsigned upvote = child["data"]["ups"].get<unsigned>();
 
+#if 0
+        unsigned upvote = child["data"]["ups"].get<unsigned>();
         if (upvote < g_upvote_threshold)
         {
             return {
@@ -303,11 +305,12 @@ Thread_Result download_media(long file_id,
                 .download_res = Download_Result::SKIPPED,
             };
         }
+#endif // 0
+
 
         const string& domain = child["data"]["domain"].get_ref<str_cref>();
 
         vector<string> urls;
-        urls.reserve(10); // feels like 10 is a good number
 
         if (domain == "v.redd.it")
         {
@@ -348,24 +351,8 @@ Thread_Result download_media(long file_id,
         {
             auto resp = perform_http_request(url);
 
-            auto split_line = [](string_cref line)
-                -> std::pair<string, string>
-            {
-                const string delimiter = "/";
-                auto pos = line.find(delimiter);
-
-                if (pos == std::string::npos)
-                    return {};
-
-                std::pair<string, string> res;
-
-                res.first = line.substr(0, pos);
-                res.second = line.substr(pos + 1);
-
-                return res;
-            };
-
-            auto extension = split_line(resp->content_type).second;
+            // TODO: big ass assumption that Utils::split_string return al least 2 values here
+            auto extension = Utils::split_string(resp->content_type, "/")[1];
 
             auto destination = std::format("{}\\{}.{}",
                                            dest_folder, title, extension);
@@ -377,7 +364,7 @@ Thread_Result download_media(long file_id,
             .title = title,
             .url = orig_url,
             // TODO: mhhhhhhhhhhhhhhhhhh
-            .download_res = Download_Result::DOWNLOADED,
+            .download_res = download_result
         };
 
     }
