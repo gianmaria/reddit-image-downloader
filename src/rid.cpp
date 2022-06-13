@@ -467,19 +467,24 @@ int rid(const string& subreddit,
                     if (thread.valid())
                     {
                         auto thread_res = thread.get(); // blocking, calls wait()
+
+                        string short_title = thread_res.title;
+                        if (Utils::UTF8_len(short_title) > g_PRINT_MAX_LEN)
+                            Utils::resize_string(short_title, g_PRINT_MAX_LEN);
+
                         if (thread_res.download_res == Download_Result::DOWNLOADED or
                             thread_res.download_res == Download_Result::SKIPPED)
                         {
                             cout << std::format("[{:04}] {:<{}.{}} -> {}",
                                                 thread_res.file_id,
-                                                thread_res.title, g_PRINT_MAX_LEN, g_PRINT_MAX_LEN,
+                                                short_title, g_PRINT_MAX_LEN, g_PRINT_MAX_LEN,
                                                 Utils::to_str(thread_res.download_res)) << endl;
                         }
                         else
                         {
                             cout << std::format("[{:04}] {:<{}.{}} -> {} url: '{}'",
                                                 thread_res.file_id,
-                                                thread_res.title, g_PRINT_MAX_LEN, g_PRINT_MAX_LEN,
+                                                short_title, g_PRINT_MAX_LEN, g_PRINT_MAX_LEN,
                                                 Utils::to_str(thread_res.download_res),
                                                 thread_res.url) << endl;
                         }
