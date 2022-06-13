@@ -331,11 +331,32 @@ Thread_Result download_media(long file_id,
                 url = handle_gfycat(url);
             }
 
-            extension = "fixed";
+            auto resp = perform_http_request(url);
+
+            auto split_line = [](string_cref line)
+                -> std::pair<string, string>
+            {
+                const string delimiter = "/";
+                auto pos = line.find(delimiter);
+
+                if (pos == std::string::npos)
+                    return {};
+
+                std::pair<string, string> res;
+
+                res.first = line.substr(0, pos);
+                res.second = line.substr(pos + 1);
+
+                return res;
+            };
+
+            extension = split_line(resp->content_type).second;
+
         }
 
         // once we have the extension use direct downlaod
-        auto destination = dest_folder + "\\" + title + "." + extension;
+        auto destination = std::format("{}\\[{}]{}.{}",
+                                       dest_folder, upvote, title, extension);
 
         auto download_result = download_file_to_disk(url, destination);
 
@@ -387,7 +408,7 @@ int rid(const string& subreddit,
 
             if (not resp.has_value())
             {
-                cout << "[WARN] Cannot download json from subreddit: " << subreddit << endl;
+                cout << "[WARN] Cannot download json from subreddit " << subreddit << endl;
                 break;
             }
 
