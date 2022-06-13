@@ -76,7 +76,7 @@ Download_Result download_file_to_disk(string_cref url,
 {
     if (fs::exists(destination))
         return Download_Result::SKIPPED;
-    
+
     auto resp = perform_http_request(url);
 
     if ((not resp.has_value()) or
@@ -122,26 +122,23 @@ optional<string> download_json_from_reddit(
         reddit_url << "&after=" << after;
     }
 
-    auto opt_resp = perform_http_request(reddit_url.str());
+    auto resp = perform_http_request(reddit_url.str());
 
-    if (!opt_resp.has_value())
+    if (!resp.has_value())
         return {};
 
-    auto& resp = opt_resp.value();
-
-    if (resp.code != 200)
+    if (resp->code != 200)
     {
         cout << std::format("[ERROR] Json request failed for url {} with code: {}",
-                            reddit_url.str(), resp.code)
-            << endl;
+                            reddit_url.str(), resp->code) << endl;
         return {};
     }
 
-    return resp.body;
+    return resp->body;
 }
 
 std::vector<string> get_url_from_imgur(string_cref subreddit,
-                                 string_cref url)
+                                       string_cref orig_url)
 {
     // https://apidocs.imgur.com/#10456589-7167-4b5c-acd3-a1e4eb6a95ed
     // api endpoint:
@@ -150,7 +147,7 @@ std::vector<string> get_url_from_imgur(string_cref subreddit,
     try
     {
         // TODO: handle gifv
-        string image_id = Utils::extract_image_id_from_url(url);
+        string image_id = Utils::extract_image_id_from_url(orig_url);
 
         string api_endpoint = "https://api.imgur.com/3/gallery/r/" + subreddit + "/" + image_id;
 
