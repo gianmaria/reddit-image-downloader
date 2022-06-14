@@ -467,7 +467,7 @@ Thread_Result download_media(long file_id,
             string destination = std::format("{}\\{}", dest_folder, title);
 
             if (urls.size() > 1)
-                destination = std::format("{}_p{}.{}", destination, part++, extension);
+                destination = std::format("{}_p{:04}.{}", destination, part++, extension);
             else
                 destination = std::format("{}.{}", destination, extension);
 
