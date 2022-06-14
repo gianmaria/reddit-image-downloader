@@ -236,12 +236,12 @@ std::vector<string> get_url_from_imgur(string_cref subreddit,
 
             for (const auto& image : images)
             {
-                urls.push_back(image["link"]);
+                urls.push_back(image["link"].get_ref<string_cref>());
             }
         }
         else
         {
-            urls.push_back(json["data"]["link"]);
+            urls.push_back(json["data"]["link"].get_ref<string_cref>());
         }
 
         return urls;

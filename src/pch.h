@@ -19,6 +19,7 @@
 #include <curlpp/Infos.hpp>
 #include <curlpp/Options.hpp>
 
+#define JSON_USE_IMPLICIT_CONVERSIONS 0
 #include <nlohmann/json.hpp>
 
 #include <argparse/argparse.hpp>
