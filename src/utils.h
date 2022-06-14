@@ -42,8 +42,11 @@ void save_after_to_file(const string& where,
 
 string extract_image_id_from_url(const string& url);
 
-std::ostream& operator<<(std::ostream& os, const Download_Res& dr);
+std::ostream& operator<<(std::ostream& os, const Download_Result& dr);
 
-string to_str(const Download_Res& dr);
+string to_str(const Download_Result& dr);
+
+vector<string> split_string(string_cref line,
+                          string_cref delimiter);
 
 }

@@ -17,7 +17,7 @@ struct HTTP_Response
     string resp_headers = "???";
 };
 
-enum class Download_Res : uint8_t
+enum class Download_Result : uint8_t
 {
     INVALID,
     DOWNLOADED,
@@ -26,17 +26,22 @@ enum class Download_Res : uint8_t
     UNABLE // don't know how to download url
 };
 
-struct Thread_Res
+struct Thread_Result
 {
     long file_id = -1;
     string title = "???";
     string url = "???";
-    Download_Res download_res = Download_Res::INVALID;
+    Download_Result download_res = Download_Result::INVALID;
 };
 
 
-optional<HTTP_Response> perform_http_request(const string& url,
-                                        const std::list<string>& headers = {});
+optional<HTTP_Response> perform_http_request(
+    const string& url,
+    const std::list<string>& headers = {});
+
+optional<HTTP_Response> request_headers_only(
+    const string& url,
+    const std::list<string>& headers = {});
 
 optional<string> download_json_from_reddit(
     const string& subreddit,
@@ -45,26 +50,24 @@ optional<string> download_json_from_reddit(
     unsigned limit = 100);
 
 
-Download_Res download_file_to_disk(string_cref url,
-                                   string_cref title,
-                                   string_cref dest_folder,
-                                   string_cref ext = "");
-
-Download_Res handle_imgur(string_cref subreddit,
-                          string_cref url,
-                          string_cref title,
-                          string_cref dest_folder);
-
-
-Download_Res handle_gfycat(
+Download_Result download_file_to_disk(
     string_cref url,
-    string_cref title,
-    string_cref dest_folder);
+    string_cref destination);
 
+std::vector<string> get_url_from_imgur(
+    string_cref subreddit,
+    string_cref url);
 
-Thread_Res download_media(long file_id,
-                          const njson& child,
-                          const string& dest_folder);
+string get_url_from_gfycat(
+    string_cref url);
+
+string get_url_from_vreddit(
+    const njson& child);
+
+Thread_Result download_media(
+    long file_id,
+    const njson& child,
+    const string& dest_folder);
 
 // reddit image downloader
 int rid(const string& subreddit,
