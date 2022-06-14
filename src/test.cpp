@@ -8,12 +8,12 @@ namespace Test
 
 void run_test()
 {
-    assert(Utils::get_file_extension_from_url("https://i.imgur.com/gBj52nI.jpg") == "jpg");
-    assert(Utils::get_file_extension_from_url("https://i.imgur.com/gBj52nI") == "");
-    assert(Utils::get_file_extension_from_url("https://gfycat.com/MeekWeightyFrogmouth") == "");
-    assert(Utils::get_file_extension_from_url("https://66.media.tumblr.com/8ead6e96ca8e3e8fe16434181e8a1493/tumblr_oruoo12vtR1s5qhggo3_1280.png") == "png");
+    assert(Utils::extract_file_extension_from_url("https://i.imgur.com/gBj52nI.jpg") == "jpg");
+    assert(Utils::extract_file_extension_from_url("https://i.imgur.com/gBj52nI") == "");
+    assert(Utils::extract_file_extension_from_url("https://gfycat.com/MeekWeightyFrogmouth") == "");
+    assert(Utils::extract_file_extension_from_url("https://66.media.tumblr.com/8ead6e96ca8e3e8fe16434181e8a1493/tumblr_oruoo12vtR1s5qhggo3_1280.png") == "png");
 
-    assert(Utils::is_extension_allowed(Utils::get_file_extension_from_url("https://i.redd.it/nqa4sfb8ns191.png")));
+    assert(Utils::is_extension_allowed(Utils::extract_file_extension_from_url("https://i.redd.it/nqa4sfb8ns191.png")));
 
 
     // gif, jpeg, png, jpg, bmp

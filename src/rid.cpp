@@ -196,7 +196,6 @@ std::vector<string> get_url_from_imgur(string_cref subreddit,
 
     try
     {
-        // TODO: handle gifv
         string image_id = Utils::extract_image_id_from_url(orig_url);
 
         string api_endpoint = "https://api.imgur.com/3/gallery/r/" + subreddit + "/" + image_id;
@@ -329,23 +328,37 @@ string get_url_from_vreddit(const njson& child)
     }
 }
 
+std::vector<string> get_url_from_reddit_gallery(const njson& child)
+{
+    std::vector<string> res;
+
+    for (const auto& id : child["data"]["media_metadata"])
+    {
+        auto& url = id["s"]["u"].get_ref<string_cref>();
+        res.push_back(url);
+    }
+
+    return res;
+}
+
 Thread_Result download_media(long file_id,
                              const njson& child,
                              const string& dest_folder)
 {
     try
     {
+        const auto& data = child["data"];
+
         auto title = Utils::remove_invalid_charaters(
-            child["data"]["title"].get_ref<str_cref>());
+            data["title"].get_ref<str_cref>());
 
         if (Utils::UTF8_len(title) > g_TITLE_MAX_LEN)
             Utils::resize_string(title, g_TITLE_MAX_LEN);
 
-        auto orig_url = child["data"]["url"].get_ref<string_cref>();
-
+        auto orig_url = data["url"].get_ref<string_cref>();
 
 #if 0
-        unsigned upvote = child["data"]["ups"].get<unsigned>();
+        unsigned upvote = data["ups"].get<unsigned>();
         if (upvote < g_upvote_threshold)
         {
             return {
@@ -357,8 +370,7 @@ Thread_Result download_media(long file_id,
         }
 #endif // 0
 
-
-        const string& domain = child["data"]["domain"].get_ref<str_cref>();
+        string_cref domain = data["domain"].get_ref<str_cref>();
 
         vector<string> urls;
 
@@ -366,9 +378,10 @@ Thread_Result download_media(long file_id,
         {
             urls.push_back(get_url_from_vreddit(child));
         }
-        else if (domain == "imgur.com")
+        else if (domain == "imgur.com" or
+                 domain == "i.imgur.com")
         {
-            string_cref subreddit = child["data"]["subreddit"].get_ref<str_cref>();
+            string_cref subreddit = data["subreddit"].get_ref<str_cref>();
 
             urls = get_url_from_imgur(subreddit, orig_url);
         }
@@ -376,9 +389,31 @@ Thread_Result download_media(long file_id,
         {
             urls.push_back(get_url_from_gfycat(orig_url));
         }
-        else
+        else if (domain == "reddit.com")
         {
-            if (Utils::get_file_extension_from_url(orig_url) != "")
+            if (data.contains("is_gallery") and
+                data["is_gallery"].get<bool>() == true)
+            {
+                urls = get_url_from_reddit_gallery(child);
+            }
+            else if (Utils::extract_file_extension_from_url(orig_url) != "")
+            {
+                urls.push_back(orig_url);
+            }
+            else
+            {
+                return {
+                    .file_id = file_id,
+                    .title = title,
+                    .url = orig_url,
+                    .download_res = Download_Result::UNABLE,
+                };
+            }
+        }
+        else // unknown domain
+        {
+            // try direct download if url has extension
+            if (Utils::extract_file_extension_from_url(orig_url) != "")
             {
                 urls.push_back(orig_url);
             }
@@ -396,6 +431,15 @@ Thread_Result download_media(long file_id,
 
         Download_Result download_result = Download_Result::INVALID;
 
+        if (urls.size() == 0)
+            return {
+                .file_id = file_id,
+                .title = title,
+                .url = orig_url,
+                .download_res = Download_Result::UNABLE
+            };
+
+        unsigned part = 1;
         for (const auto& url : urls)
         {
             auto resp = request_headers_only(url);
@@ -408,13 +452,26 @@ Thread_Result download_media(long file_id,
                     .download_res = Download_Result::FAILED
                 };
 
+            auto split_content_type = Utils::split_string(resp->content_type, "/");
             // TODO: big ass assumption that Utils::split_string return al least 2 values here
-            auto extension = Utils::split_string(resp->content_type, "/")[1];
+            auto& type = split_content_type[0];
+            auto& extension = split_content_type[1];
 
-            auto destination = std::format("{}\\{}.{}",
-                                           dest_folder, title, extension);
+            if (not (type == "video" or
+                     type == "image"))
+            {
+                download_result = Download_Result::UNABLE;
+                break;
+            }
 
-            // TODO: how to hande multiple download from a signle url....
+            string destination = std::format("{}\\{}", dest_folder, title);
+
+            if (urls.size() > 1)
+                destination = std::format("{}_p{:04}.{}", destination, part++, extension);
+            else
+                destination = std::format("{}.{}", destination, extension);
+
+            // TODO: how to hande multiple download result....
             download_result = download_file_to_disk(url, destination);
         }
 
@@ -428,7 +485,7 @@ Thread_Result download_media(long file_id,
     }
     catch (const std::exception& e)
     {
-        cout << std::format("[ECXEP][download_media()] {} url: {}",
+        cout << std::format("[EXCEP][download_media()] {} url: {}",
                             e.what(), child["data"]["url"].get_ref<str_cref>())
             << endl;
         return {};

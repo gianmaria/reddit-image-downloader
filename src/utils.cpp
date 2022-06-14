@@ -104,7 +104,7 @@ std::string remove_invalid_charaters(std::string from)
     return from;
 }
 
-std::string get_file_extension_from_url(const std::string& from)
+std::string extract_file_extension_from_url(const std::string& from)
 {
     std::stringstream buff;
 
@@ -374,6 +374,12 @@ string extract_image_id_from_url(const string& url)
 
     std::string image_id = buff.str();
     std::reverse(image_id.begin(), image_id.end());
+
+    if (auto pos = image_id.find('.');
+        pos != string::npos)
+    {
+        image_id = image_id.substr(0, pos);
+    }
 
     return image_id;
 }
