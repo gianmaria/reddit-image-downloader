@@ -23,7 +23,7 @@ std::size_t replace_all(std::string& inout, std::string_view what, std::string_v
 
 std::string remove_invalid_charaters(std::string from);
 
-std::string get_file_extension_from_url(const std::string& from);
+std::string extract_file_extension_from_url(const std::string& from);
 
 size_t UTF8_len(const string& input);
 

@@ -378,7 +378,7 @@ Thread_Result download_media(long file_id,
         }
         else
         {
-            if (Utils::get_file_extension_from_url(orig_url) != "")
+            if (Utils::extract_file_extension_from_url(orig_url) != "")
             {
                 urls.push_back(orig_url);
             }
