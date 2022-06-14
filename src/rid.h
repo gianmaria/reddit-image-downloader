@@ -64,6 +64,9 @@ string get_url_from_gfycat(
 string get_url_from_vreddit(
     const njson& child);
 
+std::vector<string> get_url_from_reddit_gallery(
+    const njson& child);
+
 Thread_Result download_media(
     long file_id,
     const njson& child,

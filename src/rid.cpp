@@ -410,7 +410,7 @@ Thread_Result download_media(long file_id,
                 };
             }
         }
-        else
+        else // unknown domain
         {
             // try direct download if url has extension
             if (Utils::extract_file_extension_from_url(orig_url) != "")
@@ -452,8 +452,8 @@ Thread_Result download_media(long file_id,
                     .download_res = Download_Result::FAILED
                 };
 
-            // TODO: big ass assumption that Utils::split_string return al least 2 values here
             auto split_content_type = Utils::split_string(resp->content_type, "/");
+            // TODO: big ass assumption that Utils::split_string return al least 2 values here
             auto& type = split_content_type[0];
             auto& extension = split_content_type[1];
 

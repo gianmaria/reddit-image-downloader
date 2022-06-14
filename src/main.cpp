@@ -11,17 +11,6 @@ int main(int argc, char* argv[])
 
     Test::run_test();
 
-#if FAKE_MAIN_ARGS
-    (void)argc;
-    (void)argv;
-
-    const string subreddit = "VaporwaveAesthetics"; // "VaporwaveAesthetics";
-    const string when = "week"; // "day"; 
-    const string dest = "🌟vaporwave-aesthetics🌟\\week"; // "🌟vaporwave-aesthetics🌟";
-
-    return rid(subreddit, when, dest);
-#else
-
     argparse::ArgumentParser program("rid", "1.0.0");
     program.add_description("Reddit Image Downloader\nAllows you to download all the top images from a specified subreddit");
     program.add_argument("subreddit")
@@ -47,5 +36,4 @@ int main(int argc, char* argv[])
     const string dest = program.get<string>("dest-folder"); // "🌟vaporwave-aesthetics🌟";
 
     return rid(subreddit, when, dest);
-#endif
 }
