@@ -196,7 +196,6 @@ std::vector<string> get_url_from_imgur(string_cref subreddit,
 
     try
     {
-        // TODO: handle gifv
         string image_id = Utils::extract_image_id_from_url(orig_url);
 
         string api_endpoint = "https://api.imgur.com/3/gallery/r/" + subreddit + "/" + image_id;
