@@ -396,7 +396,6 @@ Thread_Result download_media(long file_id,
 
         Download_Result download_result = Download_Result::INVALID;
 
-        // TODO: how to hande multiple download from a signle url....
         for (const auto& url : urls)
         {
             auto resp = request_headers_only(url);
@@ -406,7 +405,6 @@ Thread_Result download_media(long file_id,
                     .file_id = file_id,
                     .title = title,
                     .url = orig_url,
-                    // TODO: mhhhhhhhhhhhhhhhhhh
                     .download_res = Download_Result::FAILED
                 };
 
@@ -415,6 +413,8 @@ Thread_Result download_media(long file_id,
 
             auto destination = std::format("{}\\{}.{}",
                                            dest_folder, title, extension);
+
+            // TODO: how to hande multiple download from a signle url....
             download_result = download_file_to_disk(url, destination);
         }
 
@@ -422,7 +422,6 @@ Thread_Result download_media(long file_id,
             .file_id = file_id,
             .title = title,
             .url = orig_url,
-            // TODO: mhhhhhhhhhhhhhhhhhh
             .download_res = download_result
         };
 
@@ -471,7 +470,7 @@ int rid(const string& subreddit,
                 break;
             }
 
-#ifdef _DEBUG 
+#if 1
             // save json to disk for debugging purposes 
             {
                 std::ofstream out(dest_folder + "/!#_" + subreddit
