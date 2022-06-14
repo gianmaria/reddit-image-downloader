@@ -485,7 +485,7 @@ Thread_Result download_media(long file_id,
     }
     catch (const std::exception& e)
     {
-        cout << std::format("[ECXEP][download_media()] {} url: {}",
+        cout << std::format("[EXCEP][download_media()] {} url: {}",
                             e.what(), child["data"]["url"].get_ref<str_cref>())
             << endl;
         return {};
