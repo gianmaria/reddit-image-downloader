@@ -31,7 +31,7 @@ struct Thread_Result
     long file_id = -1;
     string title = "???";
     string url = "???";
-    Download_Result download_res = Download_Result::INVALID;
+    vector<Download_Result> download_res;
 };
 
 

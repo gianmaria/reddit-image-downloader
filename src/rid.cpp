@@ -8,12 +8,12 @@
 
 TODO:
 [X] multithreading
- [] download images from website other than reddit
-    [X] imgur.com
-    [] i.imgur.com
-    [x] v.redd.it
-    [x] gfycat.com
- [] download images inside a gallery! e.g. https://www.reddit.com/gallery/uw2ikr
+[X] download images from website other than reddit
+   [X] imgur.com
+   [X] i.imgur.com
+   [x] v.redd.it
+   [x] gfycat.com
+[X] download images inside a gallery! e.g. https://www.reddit.com/gallery/uw2ikr
 
  */
 
@@ -429,7 +429,7 @@ Thread_Result download_media(long file_id,
             }
         }
 
-        Download_Result download_result = Download_Result::INVALID;
+        vector<Download_Result> download_result;
 
         if (urls.size() == 0)
             return {
@@ -460,8 +460,8 @@ Thread_Result download_media(long file_id,
             if (not (type == "video" or
                      type == "image"))
             {
-                download_result = Download_Result::UNABLE;
-                break;
+                download_result.push_back(Download_Result::UNABLE);
+                continue;
             }
 
             string destination = std::format("{}\\{}", dest_folder, title);
@@ -471,8 +471,7 @@ Thread_Result download_media(long file_id,
             else
                 destination = std::format("{}.{}", destination, extension);
 
-            // TODO: how to hande multiple download result....
-            download_result = download_file_to_disk(url, destination);
+            download_result.push_back(download_file_to_disk(url, destination));
         }
 
         return {
@@ -587,21 +586,26 @@ int rid(const string& subreddit,
                         if (Utils::UTF8_len(short_title) > g_PRINT_MAX_LEN)
                             Utils::resize_string(short_title, g_PRINT_MAX_LEN);
 
-                        if (thread_res.download_res == Download_Result::DOWNLOADED or
-                            thread_res.download_res == Download_Result::SKIPPED)
+                        // one url can have multiple image associated 
+                        // for example an url that points to a gallery
+                        for (const auto& download_res : thread_res.download_res)
                         {
-                            cout << std::format("[{:04}] {:<{}.{}} -> {}",
-                                                thread_res.file_id,
-                                                short_title, g_PRINT_MAX_LEN, g_PRINT_MAX_LEN,
-                                                Utils::to_str(thread_res.download_res)) << endl;
-                        }
-                        else
-                        {
-                            cout << std::format("[{:04}] {:<{}.{}} -> {} url: '{}'",
-                                                thread_res.file_id,
-                                                short_title, g_PRINT_MAX_LEN, g_PRINT_MAX_LEN,
-                                                Utils::to_str(thread_res.download_res),
-                                                thread_res.url) << endl;
+                            if (download_res == Download_Result::DOWNLOADED or
+                                download_res == Download_Result::SKIPPED)
+                            {
+                                cout << std::format("[{:04}] {:<{}.{}} -> {}",
+                                                    thread_res.file_id,
+                                                    short_title, g_PRINT_MAX_LEN, g_PRINT_MAX_LEN,
+                                                    Utils::to_str(download_res)) << endl;
+                            }
+                            else
+                            {
+                                cout << std::format("[{:04}] {:<{}.{}} -> {} url: '{}'",
+                                                    thread_res.file_id,
+                                                    short_title, g_PRINT_MAX_LEN, g_PRINT_MAX_LEN,
+                                                    Utils::to_str(download_res),
+                                                    thread_res.url) << endl;
+                            }
                         }
                     }
                 }
