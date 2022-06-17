@@ -522,7 +522,7 @@ int rid(const string& subreddit,
 
             if (not resp.has_value())
             {
-                cout << "[WARN] Cannot download json from subreddit " << subreddit << endl;
+                cout << "[WARN] Cannot download json from subreddit /r/" << subreddit << endl;
                 break;
             }
 
