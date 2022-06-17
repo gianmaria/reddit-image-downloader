@@ -355,7 +355,7 @@ Thread_Result download_media(long file_id,
         if (Utils::UTF8_len(title) > g_TITLE_MAX_LEN)
             Utils::resize_string(title, g_TITLE_MAX_LEN);
 
-        auto orig_url = data["url"].get_ref<string_cref>();
+        const auto& orig_url = data["url"].get_ref<string_cref>();
 
 #if 0
         unsigned upvote = data["ups"].get<unsigned>();
@@ -406,7 +406,7 @@ Thread_Result download_media(long file_id,
                     .file_id = file_id,
                     .title = title,
                     .url = orig_url,
-                    .download_res = Download_Result::UNABLE,
+                    .download_res = {Download_Result::UNABLE}
                 };
             }
         }
@@ -424,7 +424,7 @@ Thread_Result download_media(long file_id,
                     .file_id = file_id,
                     .title = title,
                     .url = orig_url,
-                    .download_res = Download_Result::UNABLE,
+                    .download_res = {Download_Result::UNABLE}
                 };
             }
         }
@@ -436,7 +436,7 @@ Thread_Result download_media(long file_id,
                 .file_id = file_id,
                 .title = title,
                 .url = orig_url,
-                .download_res = Download_Result::UNABLE
+                .download_res = {Download_Result::UNABLE}
             };
 
         unsigned part = 1;
@@ -449,7 +449,7 @@ Thread_Result download_media(long file_id,
                     .file_id = file_id,
                     .title = title,
                     .url = orig_url,
-                    .download_res = Download_Result::FAILED
+                    .download_res = {Download_Result::FAILED}
                 };
 
             auto split_content_type = Utils::split_string(resp->content_type, "/");
