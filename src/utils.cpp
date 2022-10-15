@@ -388,7 +388,7 @@ std::ostream& operator<<(std::ostream& os, const Download_Result& dr)
 {
     switch (dr)
     {
-        case Download_Result::INVALID: os << "INVALID ENUM VALUE"; break;
+        case Download_Result::INVALID_ENUM: os << "INVALID ENUM VALUE"; break;
         case Download_Result::SKIPPED: os << "SKIP"; break;
         case Download_Result::DOWNLOADED: os << "OK ( ✅ )"; break;
         case Download_Result::FAILED: os << "FAILED ( 🛑 )"; break;

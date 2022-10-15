@@ -14,6 +14,8 @@
 #include <thread>
 #include <vector>
 
+#include <argparse/argparse.hpp>
+
 #include <curlpp/cURLpp.hpp>
 #include <curlpp/Easy.hpp>
 #include <curlpp/Infos.hpp>
@@ -21,9 +23,6 @@
 
 #define JSON_USE_IMPLICIT_CONVERSIONS 0
 #include <nlohmann/json.hpp>
-
-#include <argparse/argparse.hpp>
-
 
 using std::cout;
 using std::wcout;

@@ -514,6 +514,11 @@ int rid(const string& subreddit,
 
         long files_processed = 0;
 
+        unsigned downloaded = 0;
+        unsigned failed = 0;
+        unsigned skipped = 0;
+        unsigned unable = 0;
+
         while (true)
         {
             auto resp = download_json_from_reddit(subreddit,
@@ -586,10 +591,19 @@ int rid(const string& subreddit,
                         if (Utils::UTF8_len(short_title) > g_PRINT_MAX_LEN)
                             Utils::resize_string(short_title, g_PRINT_MAX_LEN);
 
-                        // one url can have multiple image associated 
+                        // one url can have multiple images associated 
                         // for example an url that points to a gallery
                         for (const auto& download_res : thread_res.download_res)
                         {
+                            switch (download_res)
+                            {
+                            case Download_Result::DOWNLOADED: ++downloaded; break;
+                            case Download_Result::FAILED: ++failed; break;
+                            case Download_Result::SKIPPED: ++skipped; break;
+                            case Download_Result::UNABLE: ++unable; break;
+                            default: break;
+                            }
+
                             if (download_res == Download_Result::DOWNLOADED or
                                 download_res == Download_Result::SKIPPED)
                             {
@@ -615,6 +629,11 @@ int rid(const string& subreddit,
             {
                 // nothing left do do, we downloaded everything
                 cout << "All done!" << endl;
+                cout << "Downloaded: " << downloaded << endl;
+                cout << "Skipped: " << skipped<< endl;
+                cout << "Unable: " << unable << endl;
+                cout << "Failed: " << failed << endl;
+
                 fs::remove(dest_folder + "/after.txt");
                 break;
             }

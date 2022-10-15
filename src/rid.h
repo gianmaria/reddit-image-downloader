@@ -19,7 +19,7 @@ struct HTTP_Response
 
 enum class Download_Result : uint8_t
 {
-    INVALID,
+    INVALID_ENUM,
     DOWNLOADED,
     FAILED,
     SKIPPED, // file already downloaded
